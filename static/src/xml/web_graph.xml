@@ -1,0 +1,4 @@
+<template>
+    <div t-name="GoogleChartView" t-att-id="element_id+'-'+chart+'chart'"
+         style="height:300px;position:relative;"/>
+</template>
