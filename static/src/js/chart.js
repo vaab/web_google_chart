@@ -8,14 +8,18 @@ var QWeb = oe.web.qweb,
      _lt = oe.web._lt;
 
 
+/**
+ * Aggregate Functions
+ */
+
 function make_agg_fun(aggregate2, neutral_value) {
   function agg_fun() {
-    if (arguments.length == 0)
-      return neutral_value;
-    var first = arguments.shift();
-    if (arguments.length == 0)
-      return first;
-    return aggregate2(first, agg_fun.apply(this, arguments));
+    if (arguments.length == 0) return neutral_value;
+    var args = Array.prototype.slice.call(arguments);
+    var first = args.shift();
+    if (typeof first === "undefined") return agg_fun.apply(this, args);
+    if (args.length == 0) return first;
+    return aggregate2(first, agg_fun.apply(this, args));
   };
   return agg_fun
 };
@@ -27,9 +31,9 @@ function get_agg_fun(op) {
   case '*':
     return make_agg_fun(function(a, b) { return a * b; }, 1);
   case 'min':
-    return make_agg_fun(function(a, b) { return Math.min(a, b); }, Infinity);
+    return make_agg_fun(Math.min, Infinity);
   case 'max':
-    return make_agg_fun(function(a, b) { return Math.max(a, b); }, -Infinity);
+    return make_agg_fun(Math.max, -Infinity);
   };
 };
 
@@ -37,6 +41,10 @@ function get_agg_neutral(op) {
   return get_agg_fun(op)();
 }
 
+
+/**
+ * Widget code
+ */
 
 oe.web.views.add('graph', 'openerp.web_google_chart.ChartView');
 
@@ -214,24 +222,8 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
             // _(self.columns).each(function (column) {
                 var val = record[column.name],
                     aggregate = datapoint[column.name];
-
-                switch(column.operator) {
-                case '+':
-                    datapoint[column.name] = (aggregate || 0) + val;
-                    return;
-                case '*':
-                    datapoint[column.name] = (aggregate || 1) * val;
-                    return;
-                case 'min':
-                    datapoint[column.name] = (aggregate || Infinity) > val
-                                           ? val
-                                           : aggregate;
-                    return;
-                case 'max':
-                    datapoint[column.name] = (aggregate || -Infinity) < val
-                                           ? val
-                                           : aggregate;
-                }
+                datapoint[column.name] = get_agg_fun(column.operator)(aggregate, val);
+                return;
             // });
 
         });
@@ -295,23 +287,7 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
             _(self.columns).each(function (column) {
                 var val = record[column.name],
                     aggregate = datapoint[column.name];
-                switch(column.operator) {
-                case '+':
-                    datapoint[column.name] = (aggregate || 0) + val;
-                    return;
-                case '*':
-                    datapoint[column.name] = (aggregate || 1) * val;
-                    return;
-                case 'min':
-                    datapoint[column.name] = (aggregate || Infinity) > val
-                                           ? val
-                                           : aggregate;
-                    return;
-                case 'max':
-                    datapoint[column.name] = (aggregate || -Infinity) < val
-                                           ? val
-                                           : aggregate;
-                }
+                datapoint[column.name] = get_agg_fun(column.operator)(aggregate, val);
             });
 
             if (!r) { graph_data.push(datapoint); }
