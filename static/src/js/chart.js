@@ -45,8 +45,7 @@ function get_agg_neutral(op) {
  * Miscellanious functions
  */
 
-function capitaliseFirstLetter(string)
-{
+function capitaliseFirstLetter(string) {
     return string.charAt(0).toUpperCase() + string.slice(1);
 }
 
@@ -188,7 +187,7 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
         });
 
 
-        if (_.include(['bar','line','area'],this.chart)) {
+        if (_.include(['bar','line','area'], this.chart)) {
             return this.schedule_bar_line_area(records);
         } else if (this.chart == "pie") {
             return this.schedule_pie(records);
