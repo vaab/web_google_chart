@@ -7,6 +7,37 @@ openerp.web_google_chart = function (oe) {
 var QWeb = oe.web.qweb,
      _lt = oe.web._lt;
 
+
+function make_agg_fun(aggregate2, neutral_value) {
+  function agg_fun() {
+    if (arguments.length == 0)
+      return neutral_value;
+    var first = arguments.shift();
+    if (arguments.length == 0)
+      return first;
+    return aggregate2(first, agg_fun.apply(this, arguments));
+  };
+  return agg_fun
+};
+
+function get_agg_fun(op) {
+  switch(op) {
+  case '+':
+    return make_agg_fun(function(a, b) { return a + b; }, 0);
+  case '*':
+    return make_agg_fun(function(a, b) { return a * b; }, 1);
+  case 'min':
+    return make_agg_fun(function(a, b) { return Math.min(a, b); }, Infinity);
+  case 'max':
+    return make_agg_fun(function(a, b) { return Math.max(a, b); }, -Infinity);
+  };
+};
+
+function get_agg_neutral(op) {
+  return get_agg_fun(op)();
+}
+
+
 oe.web.views.add('graph', 'openerp.web_google_chart.ChartView');
 
 oe.web_google_chart.ChartView = oe.web.View.extend({
@@ -40,6 +71,7 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
         var self = this;
         this._super();
         var loaded;
+
         if (this.embedded_view) {
             loaded = $.when([self.embedded_view]);
         } else {
@@ -92,9 +124,12 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
         this.is_loaded.resolve();
     },
 
-    schedule_chart: function(results) {
+      /** Prepares chart data for javascript library
+       *
+       */
+    schedule_chart: function(results) { 
         var self = this;
-        this.$element.html(QWeb.render("GraphView", {
+        this.$element.html(QWeb.render("GoogleChartView", {
             "fields_view": this.fields_view,
             "chart": this.chart,
             'element_id': this.widget_parent.element_id
@@ -135,12 +170,113 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
             });
             return point;
         });
-        // aggregate data, because dhtmlx is crap. Aggregate on abscissa field,
-        // leave split on group field => max m*n records where m is the # of
-        // values for the abscissa and n is the # of values for the group field
-        var graph_data = [];
+
+
+        if (_.include(['bar','line','area'],this.chart)) {
+            return this.schedule_bar_line_area(records);
+        } else if (this.chart == "pie") {
+            return this.schedule_pie(records);
+        }
+    },
+
+    g_column_type: function(field) {
+      var oe_type = this.fields[field].type;
+      if (_.include(['integer', 'float'], oe_type))
+        return "number";
+      return "string";
+    },
+
+    prepare_data_grouped_bar: function(records) {
+      var self = this;
+        var graph_data = {};
+        var abscissas = []; // list of different abscissas values
+        var groups = [];    // list of different group values
+        var groups_label = {}; // store association of id -> label for group if any
+        var group_field = (records.length > 0 && 
+                           records[0][self.group_field + '__id'])?self.group_field + '__id':self.group_field;
+        var column = self.columns[0]; // XXXvlab: could we have multi-columns here ?
         _(records).each(function (record) {
-            var group_field = record[self.group_field + '__id']?self.group_field + '__id':self.group_field;
+
+            var abscissa = record[self.abscissa],
+              group = record[group_field];
+
+            if (!_.include(abscissas, abscissa)) abscissas.push(abscissa);
+            if (!_.include(groups, group)) {
+              groups.push(group);
+              groups_label[group] = record[self.group_field];
+            };
+
+            if (!graph_data[abscissa])        graph_data[abscissa] = {}
+            if (!graph_data[abscissa][group]) graph_data[abscissa][group] = {}
+
+            var datapoint = graph_data[abscissa][group];
+
+            // _(self.columns).each(function (column) {
+                var val = record[column.name],
+                    aggregate = datapoint[column.name];
+
+                switch(column.operator) {
+                case '+':
+                    datapoint[column.name] = (aggregate || 0) + val;
+                    return;
+                case '*':
+                    datapoint[column.name] = (aggregate || 1) * val;
+                    return;
+                case 'min':
+                    datapoint[column.name] = (aggregate || Infinity) > val
+                                           ? val
+                                           : aggregate;
+                    return;
+                case 'max':
+                    datapoint[column.name] = (aggregate || -Infinity) < val
+                                           ? val
+                                           : aggregate;
+                }
+            // });
+
+        });
+
+        abscissas.sort();
+        // we want to sort grouped field upon it's real label and not it's numeric id.
+        groups = _(groups).sortBy(function (group) {
+            return groups_label[group];
+        });
+
+        graph_data = _(abscissas).map(function(abscissa) {
+            var line = graph_data[abscissa];
+
+            return [abscissa?abscissa:"unspecified"].concat(_(groups).map(function(group) {
+                  return line[group]?line[group][column.name]:get_agg_neutral(column.operator);
+                }));
+        });
+
+        /* Convert to google data containuer
+         *
+         */
+
+        var types = {}
+        types[self.abscissa] = this.g_column_type(self.abscissa);
+        var columns_title = [self.fields[self.abscissa].string];
+
+        _(groups).each(function (group) {
+            columns_title.push(groups_label[group]);
+          });
+
+        return google.visualization.arrayToDataTable([columns_title].concat(graph_data));
+    },
+
+    prepare_data_bar: function(records) {
+      var self = this;
+        debugger;
+
+        // Aggregate on abscissa field, leave split on group field =>
+        // max m*n records where m is the # of values for the abscissa
+        // and n is the # of values for the group field
+        var graph_data = [];
+        var group_field = (records.length > 0 && 
+                           records[0][self.group_field + '__id'])?self.group_field + '__id':self.group_field;
+
+        _(records).each(function (record) {
 
             var abscissa = record[self.abscissa],
                 group = record[group_field];
@@ -184,17 +320,60 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
         graph_data = _(graph_data).sortBy(function (point) {
             return point[self.abscissa] + '[[--]]' + point[self.group_field];
         });
-        if (_.include(['bar','line','area'],this.chart)) {
-            return this.schedule_bar_line_area(graph_data);
-        } else if (this.chart == "pie") {
-            return this.schedule_pie(graph_data);
-        }
+
+        /* Convert to google data containuer
+         *
+         */
+        var data = new google.visualization.DataTable();
+
+        // ensure the abscissa is first column
+        debugger;
+        var columns = [self.abscissa].concat(_(this.columns).pluck("name"));
+        if (this.group_field) { columns.push(this.group_field); }
+
+        var types = {}
+        _(columns).each(function (field) {
+            var type = "string";
+            var oe_type = self.fields[field].type;
+            if (_.include(['integer', 'float'], oe_type))
+              type = "number";
+            types[field] = type;
+            data.addColumn(type, self.fields[field].string);
+          });
+
+        var rows = _(graph_data).map(function(record) {
+            return _(columns).map(function(field) {
+                switch(types[field]) {
+                  case 'string':
+                    try {
+                      return record[field].toString();
+                    } catch(e) {
+                      debugger;
+                    };
+                case 'number':
+                  return record[field];
+                };
+              });
+          });
+
+        data.addRows(rows);
+        return data;
     },
-    schedule_bar_line_area: function(results) {
+
+    schedule_bar_line_area: function(data) {
+      
         var self = this;
         var group_list,
         view_chart = (self.chart == 'line')?'line':(self.chart == 'area')?'area':'';
-        if (!this.group_field || !results.length) {
+
+        // Get appropriate google data
+        if (this.group_field)
+          data = this.prepare_data_grouped_bar(data);
+        else
+          data = this.prepare_data_bar(data);
+
+        if (!this.group_field) { // XXXvlab: || !data.length) {
+
             if (self.chart == 'bar'){
                 view_chart = (this.orientation === 'horizontal') ? 'barH' : 'bar';
             }
@@ -202,7 +381,7 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
                 return {
                     group: column.name,
                     text: self.fields[column.name].string,
-                    color: COLOR_PALETTE[index % (COLOR_PALETTE.length)]
+                    // color: COLOR_PALETTE[index % (COLOR_PALETTE.length)]
                 }
             });
         } else {
@@ -224,38 +403,22 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
                         ? 'stackedBarH' : 'stackedBar';
             }
             
-            var group_field = results[0][this.group_field+"__id"]?this.group_field+"__id":self.group_field;
-            group_list = _(results).chain()
-                    .pluck(group_field)
-                    .uniq()
-                    .map(function (value, index) {
-                        var groupval = '';
-                        if(value) {
-                            groupval = '' + value;
-                        }
-                        return {
-                            group: _.str.sprintf('%s_%s', self.ordinate, groupval),
-                            text: results[index][self.group_field],
-                            color: COLOR_PALETTE[index % COLOR_PALETTE.length]
-                        };
-                    }).value();
+            // var group_field = data[0][this.group_field+"__id"]?this.group_field+"__id":self.group_field;
+            // group_list = _(data).chain()
+            //         .pluck(group_field)
+            //         .uniq()
+            //         .map(function (value, index) {
+            //             var groupval = '';
+            //             if(value) {
+            //                 groupval = '' + value;
+            //             }
+            //             return {
+            //                 group: _.str.sprintf('%s_%s', self.ordinate, groupval),
+            //                 text: data[index][self.group_field],
+            //                 // color: COLOR_PALETTE[index % COLOR_PALETTE.length]
+            //             };
+            //         }).value();
 
-            results = _(results).chain()
-                .groupBy(function (record) { return record[self.abscissa]; })
-                .map(function (records) {
-                    var r = {};
-                    // second argument is coerced to a str, no good for boolean
-
-                    var group_field = records[0][self.group_field + '__id']?self.group_field + '__id':self.group_field;
-                    r[self.abscissa] = records[0][self.abscissa];
-                    _(records).each(function (record) {
-                        var value = record[group_field];
-                        var key = _.str.sprintf('%s_%s', self.ordinate, value);
-                        r[key] = record[self.ordinate];
-                    });
-                    return r;
-                })
-                .value();
         }
         var abscissa_description = {
             title: "<b>" + this.fields[this.abscissa].string + "</b>",
@@ -282,122 +445,145 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
                 return;
             }
             self.renderer = null;
-            var charts = new dhtmlXChart({
-                view: view_chart,
-                container: self.widget_parent.element_id+"-"+self.chart+"chart",
-                value:"#"+group_list[0].group+"#",
-                gradient: (self.chart == "bar") ? "3d" : "light",
-                alpha: (self.chart == "area") ? 0.6 : 1,
-                border: false,
-                width: 1024,
-                tooltip:{
-                    template: _.str.sprintf("#%s#, %s=#%s#",
-                        self.abscissa, group_list[0].text, group_list[0].group)
-                },
-                radius: 0,
-                color: (self.chart != "line") ? group_list[0].color : "",
-                item: (self.chart == "line") ? {
-                            borderColor: group_list[0].color,
-                            color: "#000000"
-                        } : "",
-                line: (self.chart == "line") ? {
-                            color: group_list[0].color,
-                            width: 3
-                        } : "",
-                origin:0,
-                xAxis: x_axis,
-                yAxis: y_axis,
-                padding: {
-                    left: 75
-                },
-                legend: {
-                    values: group_list,
-                    align:"left",
-                    valign:"top",
-                    layout: "x",
-                    marker: {
-                        type:"round",
-                        width:12
-                    }
-                }
-            });
+
+            var options = {};
+            debugger;
+            var chart = new google.visualization.ColumnChart(
+                document.getElementById(self.widget_parent.element_id+"-"+self.chart+"chart"));
+            chart.draw(data, options);
+            // var charts = new dhtmlXChart({
+            //     view: view_chart,
+            //     container: self.widget_parent.element_id+"-"+self.chart+"chart",
+            //     value:"#"+group_list[0].group+"#",
+            //     gradient: (self.chart == "bar") ? "3d" : "light",
+            //     alpha: (self.chart == "area") ? 0.6 : 1,
+            //     border: false,
+            //     width: 1024,
+            //     tooltip:{
+            //         template: _.str.sprintf("#%s#, %s=#%s#",
+            //             self.abscissa, group_list[0].text, group_list[0].group)
+            //     },
+            //     radius: 0,
+            //     color: (self.chart != "line") ? group_list[0].color : "",
+            //     item: (self.chart == "line") ? {
+            //                 borderColor: group_list[0].color,
+            //                 color: "#000000"
+            //             } : "",
+            //     line: (self.chart == "line") ? {
+            //                 color: group_list[0].color,
+            //                 width: 3
+            //             } : "",
+            //     origin:0,
+            //     xAxis: x_axis,
+            //     yAxis: y_axis,
+            //     padding: {
+            //         left: 75
+            //     },
+            //     legend: {
+            //         values: group_list,
+            //         align:"left",
+            //         valign:"top",
+            //         layout: "x",
+            //         marker: {
+            //             type:"round",
+            //             width:12
+            //         }
+            //     }
+            // });
+
             // XXXvlab: wtf ?
             // self.$element.find("#"+self.widget_parent.element_id+"-"+self.chart+"chart").width(
             //     self.$element.find("#"+self.widget_parent.element_id+"-"+self.chart+"chart").width()+120);
 
-            for (var m = 1; m<group_list.length;m++){
-                var column = group_list[m];
-                if (column.group === self.group_field) { continue; }
-                charts.addSeries({
-                    value: "#"+column.group+"#",
-                    tooltip:{
-                        template: _.str.sprintf("#%s#, %s=#%s#",
-                            self.abscissa, column.text, column.group)
-                    },
-                    color: (self.chart != "line") ? column.color : "",
-                    item: (self.chart == "line") ? {
-                            borderColor: column.color,
-                            color: "#000000"
-                        } : "",
-                    line: (self.chart == "line") ? {
-                            color: column.color,
-                            width: 3
-                        } : ""
-                });
-            }
-            charts.parse(results, "json");
-            self.$element.find("#"+self.widget_parent.element_id+"-"+self.chart+"chart").height(
-                self.$element.find("#"+self.widget_parent.element_id+"-"+self.chart+"chart").height()+50);
-            charts.attachEvent("onItemClick", function(id) {
-                self.open_list_view(charts.get(id));
-            });
+            // for (var m = 1; m<group_list.length;m++){
+            //     var column = group_list[m];
+            //     if (column.group === self.group_field) { continue; }
+            //     charts.addSeries({
+            //         value: "#"+column.group+"#",
+            //         tooltip:{
+            //             template: _.str.sprintf("#%s#, %s=#%s#",
+            //                 self.abscissa, column.text, column.group)
+            //         },
+            //         color: (self.chart != "line") ? column.color : "",
+            //         item: (self.chart == "line") ? {
+            //                 borderColor: column.color,
+            //                 color: "#000000"
+            //             } : "",
+            //         line: (self.chart == "line") ? {
+            //                 color: column.color,
+            //                 width: 3
+            //             } : ""
+            //     });
+            // }
+
+            // charts.parse(data, "json");
+
+            // self.$element.find("#"+self.widget_parent.element_id+"-"+self.chart+"chart").height(
+            //     self.$element.find("#"+self.widget_parent.element_id+"-"+self.chart+"chart").height()+50);
+            // charts.attachEvent("onItemClick", function(id) {
+            //     self.open_list_view(charts.get(id));
+            // });
         };
         if (this.renderer) {
             clearTimeout(this.renderer);
         }
         this.renderer = setTimeout(renderer, 0);
     },
-    schedule_pie: function(result) {
+
+    schedule_pie: function(records) {
+
         var self = this;
+
         var renderer = function () {
+
             if (self.$element.is(':hidden')) {
                 self.renderer = setTimeout(renderer, 100);
                 return;
             }
+
             self.renderer = null;
-            var chart =  new dhtmlXChart({
-                view:"pie3D",
-                container:self.widget_parent.element_id+"-piechart",
-                value:"#"+self.ordinate+"#",
-                pieInnerText:function(obj) {
-                    var sum = chart.sum("#"+self.ordinate+"#");
-                    var val = obj[self.ordinate] / sum * 100 ;
-                    return val.toFixed(1) + "%";
-                },
-                tooltip:{
-                    template:"#"+self.abscissa+"#"+"="+"#"+self.ordinate+"#"
-                },
-                gradient:"3d",
-                height: 20,
-                radius: 200,
-                legend: {
-                    width: 300,
-                    align:"left",
-                    valign:"top",
-                    layout: "x",
-                    marker:{
-                        type:"round",
-                        width:12
-                    },
-                    template:function(obj){
-                        return obj[self.abscissa] || 'Undefined';
-                    }
-                }
-            });
-            chart.parse(result,"json");
-            chart.attachEvent("onItemClick", function(id) {
-                self.open_list_view(chart.get(id));
-            });
+
+            data = this.prepare_data_bar(records);
+
+            var options = {
+            };
+
+            var chart = new google.visualization.PieChart(
+                  document.getElementById(self.widget_parent.element_id+'-piechart'));
+
+            chart.draw(data, options);
+            // var chart =  new dhtmlXChart({
+            //     view:"pie3D",
+            //     container:self.widget_parent.element_id+"-piechart",
+            //     value:"#"+self.ordinate+"#",
+            //     pieInnerText:function(obj) {
+            //         var sum = chart.sum("#"+self.ordinate+"#");
+            //         var val = obj[self.ordinate] / sum * 100 ;
+            //         return val.toFixed(1) + "%";
+            //     },
+            //     tooltip:{
+            //         template:"#"+self.abscissa+"#"+"="+"#"+self.ordinate+"#"
+            //     },
+            //     gradient:"3d",
+            //     height: 20,
+            //     radius: 200,
+            //     legend: {
+            //         width: 300,
+            //         align:"left",
+            //         valign:"top",
+            //         layout: "x",
+            //         marker:{
+            //             type:"round",
+            //             width:12
+            //         },
+            //         template:function(obj){
+            //             return obj[self.abscissa] || 'Undefined';
+            //         }
+            //     }
+            // });
+            // chart.attachEvent("onItemClick", function(id) {
+            //     self.open_list_view(chart.get(id));
+            // });
         };
         if (this.renderer) {
             clearTimeout(this.renderer);
@@ -406,6 +592,7 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
     },
 
     open_list_view : function (id){
+      debugger;
         var self = this;
         // unconditionally nuke tooltips before switching view
         $(".dhx_tooltip").remove('div');
