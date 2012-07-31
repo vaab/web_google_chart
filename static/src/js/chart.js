@@ -343,35 +343,19 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
     },
 
     schedule_bar_line_area: function(data) {
-      var options = {};
-        var self = this;
 
-        var view_chart = self.chart;
+        var self = this;
+        var options = {};             // google chart options associative array
+        var view_chart = self.chart;  // google chart widget name
 
         if (self.chart == 'bar') {
           view_chart = (this.orientation === 'horizontal') ? 'bar':'column';
         }
 
-        // Get appropriate google data
-        if (this.group_field)
-          data = this.prepare_data_grouped_bar(data);
-        else
-          data = this.prepare_data_bar(data);
-
-        if (!this.group_field) { // XXXvlab: || !data.length) {
-
-            if (self.chart == 'bar') {
-              view_chart = (this.orientation === 'horizontal') ? 'bar':'column';
-            }
-            // group_list = _(this.columns).map(function (column, index) {
-            //     return {
-            //         group: column.name,
-            //         text: self.fields[column.name].string,
-            //         // color: COLOR_PALETTE[index % (COLOR_PALETTE.length)]
-            //     }
-            // });
+        if (!this.group_field || !data.length) {
+            data = this.prepare_data_bar(data);
         } else {
-            // dhtmlx handles clustered bar charts (> 1 column per abscissa
+            // google chart handles clustered bar charts (> 1 column per abscissa
             // value) and stacked bar charts (basically the same but with the
             // columns on top of one another instead of side by side), but it
             // does not handle clustered stacked bar charts
@@ -387,43 +371,9 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
             if (self.chart == 'bar') {
               options['isStacked'] = true;
             }
-
-            // var group_field = data[0][this.group_field+"__id"]?this.group_field+"__id":self.group_field;
-            // group_list = _(data).chain()
-            //         .pluck(group_field)
-            //         .uniq()
-            //         .map(function (value, index) {
-            //             var groupval = '';
-            //             if(value) {
-            //                 groupval = '' + value;
-            //             }
-            //             return {
-            //                 group: _.str.sprintf('%s_%s', self.ordinate, groupval),
-            //                 text: data[index][self.group_field],
-            //                 // color: COLOR_PALETTE[index % COLOR_PALETTE.length]
-            //             };
-            //         }).value();
-
+            data = this.prepare_data_grouped_bar(data);
         }
-        var abscissa_description = {
-            title: "<b>" + this.fields[this.abscissa].string + "</b>",
-            template: function (obj) {
-                return obj[self.abscissa] || 'Undefined';
-            }
-        };
-        var ordinate_description = {
-            lines: true,
-            title: "<b>" + this.fields[this.ordinate].string + "</b>"
-        };
 
-        // var x_axis, y_axis;
-        // if (self.chart == 'bar' && self.orientation == 'horizontal') {
-        //     x_axis = ordinate_description;
-        //     y_axis = abscissa_description;
-        // } else {
-        //     x_axis = abscissa_description;
-        //     y_axis = ordinate_description;
-        // }
         var renderer = function () {
             if (self.$element.is(':hidden')) {
                 self.renderer = setTimeout(renderer, 100);
@@ -436,72 +386,6 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
                 document.getElementById(self.widget_parent.element_id+"-"+self.chart+"chart"));
 
             chart.draw(data, options);
-            // var charts = new dhtmlXChart({
-            //     view: view_chart,
-            //     container: self.widget_parent.element_id+"-"+self.chart+"chart",
-            //     value:"#"+group_list[0].group+"#",
-            //     gradient: (self.chart == "bar") ? "3d" : "light",
-            //     alpha: (self.chart == "area") ? 0.6 : 1,
-            //     border: false,
-            //     width: 1024,
-            //     tooltip:{
-            //         template: _.str.sprintf("#%s#, %s=#%s#",
-            //             self.abscissa, group_list[0].text, group_list[0].group)
-            //     },
-            //     radius: 0,
-            //     color: (self.chart != "line") ? group_list[0].color : "",
-            //     item: (self.chart == "line") ? {
-            //                 borderColor: group_list[0].color,
-            //                 color: "#000000"
-            //             } : "",
-            //     line: (self.chart == "line") ? {
-            //                 color: group_list[0].color,
-            //                 width: 3
-            //             } : "",
-            //     origin:0,
-            //     xAxis: x_axis,
-            //     yAxis: y_axis,
-            //     padding: {
-            //         left: 75
-            //     },
-            //     legend: {
-            //         values: group_list,
-            //         align:"left",
-            //         valign:"top",
-            //         layout: "x",
-            //         marker: {
-            //             type:"round",
-            //             width:12
-            //         }
-            //     }
-            // });
-
-            // XXXvlab: wtf ?
-            // self.$element.find("#"+self.widget_parent.element_id+"-"+self.chart+"chart").width(
-            //     self.$element.find("#"+self.widget_parent.element_id+"-"+self.chart+"chart").width()+120);
-
-            // for (var m = 1; m<group_list.length;m++){
-            //     var column = group_list[m];
-            //     if (column.group === self.group_field) { continue; }
-            //     charts.addSeries({
-            //         value: "#"+column.group+"#",
-            //         tooltip:{
-            //             template: _.str.sprintf("#%s#, %s=#%s#",
-            //                 self.abscissa, column.text, column.group)
-            //         },
-            //         color: (self.chart != "line") ? column.color : "",
-            //         item: (self.chart == "line") ? {
-            //                 borderColor: column.color,
-            //                 color: "#000000"
-            //             } : "",
-            //         line: (self.chart == "line") ? {
-            //                 color: column.color,
-            //                 width: 3
-            //             } : ""
-            //     });
-            // }
-
-            // charts.parse(data, "json");
 
             // self.$element.find("#"+self.widget_parent.element_id+"-"+self.chart+"chart").height(
             //     self.$element.find("#"+self.widget_parent.element_id+"-"+self.chart+"chart").height()+50);
@@ -509,17 +393,18 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
             //     self.open_list_view(charts.get(id));
             // });
         };
+ 
         if (this.renderer) {
             clearTimeout(this.renderer);
         }
+
         this.renderer = setTimeout(renderer, 0);
     },
 
     schedule_pie: function(records) {
 
-      var options = {
-      };
       var self = this;
+      var options = {};
 
       var renderer = function () {
 
@@ -532,40 +417,10 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
 
             data = self.prepare_data_bar(records);
 
-
             var chart = new google.visualization.PieChart(
                   document.getElementById(self.widget_parent.element_id+'-piechart'));
 
             chart.draw(data, options);
-            // var chart =  new dhtmlXChart({
-            //     view:"pie3D",
-            //     container:self.widget_parent.element_id+"-piechart",
-            //     value:"#"+self.ordinate+"#",
-            //     pieInnerText:function(obj) {
-            //         var sum = chart.sum("#"+self.ordinate+"#");
-            //         var val = obj[self.ordinate] / sum * 100 ;
-            //         return val.toFixed(1) + "%";
-            //     },
-            //     tooltip:{
-            //         template:"#"+self.abscissa+"#"+"="+"#"+self.ordinate+"#"
-            //     },
-            //     gradient:"3d",
-            //     height: 20,
-            //     radius: 200,
-            //     legend: {
-            //         width: 300,
-            //         align:"left",
-            //         valign:"top",
-            //         layout: "x",
-            //         marker:{
-            //             type:"round",
-            //             width:12
-            //         },
-            //         template:function(obj){
-            //             return obj[self.abscissa] || 'Undefined';
-            //         }
-            //     }
-            // });
             // chart.attachEvent("onItemClick", function(id) {
             //     self.open_list_view(chart.get(id));
             // });
@@ -577,7 +432,7 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
     },
 
     open_list_view : function (id){
-      debugger;
+        debugger;
         var self = this;
         // unconditionally nuke tooltips before switching view
         $(".dhx_tooltip").remove('div');
