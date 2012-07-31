@@ -267,8 +267,7 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
 
     prepare_data_bar: function(records) {
       var self = this;
-        debugger;
-
+      
         // Aggregate on abscissa field, leave split on group field =>
         // max m*n records where m is the # of values for the abscissa
         // and n is the # of values for the group field
@@ -327,7 +326,6 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
         var data = new google.visualization.DataTable();
 
         // ensure the abscissa is first column
-        debugger;
         var columns = [self.abscissa].concat(_(this.columns).pluck("name"));
         if (this.group_field) { columns.push(this.group_field); }
 
