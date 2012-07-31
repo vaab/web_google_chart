@@ -361,7 +361,7 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
     },
 
     schedule_bar_line_area: function(data) {
-      
+      var options = {};
         var self = this;
         var group_list,
         view_chart = (self.chart == 'line')?'line':(self.chart == 'area')?'area':'';
@@ -399,10 +399,9 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
             // transform series for clustered charts into series for stacked
             // charts
             if (self.chart == 'bar'){
-                view_chart = (this.orientation === 'horizontal')
-                        ? 'stackedBarH' : 'stackedBar';
+              options['isStacked'] = true;
             }
-            
+
             // var group_field = data[0][this.group_field+"__id"]?this.group_field+"__id":self.group_field;
             // group_list = _(data).chain()
             //         .pluck(group_field)
@@ -446,8 +445,6 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
             }
             self.renderer = null;
 
-            var options = {};
-            debugger;
             var chart = new google.visualization.ColumnChart(
                 document.getElementById(self.widget_parent.element_id+"-"+self.chart+"chart"));
             chart.draw(data, options);
@@ -532,9 +529,11 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
 
     schedule_pie: function(records) {
 
-        var self = this;
+      var options = {
+      };
+      var self = this;
 
-        var renderer = function () {
+      var renderer = function () {
 
             if (self.$element.is(':hidden')) {
                 self.renderer = setTimeout(renderer, 100);
@@ -543,10 +542,8 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
 
             self.renderer = null;
 
-            data = this.prepare_data_bar(records);
+            data = self.prepare_data_bar(records);
 
-            var options = {
-            };
 
             var chart = new google.visualization.PieChart(
                   document.getElementById(self.widget_parent.element_id+'-piechart'));
