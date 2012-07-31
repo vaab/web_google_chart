@@ -41,6 +41,14 @@ function get_agg_neutral(op) {
   return get_agg_fun(op)();
 }
 
+/**
+ * Miscellanious functions
+ */
+
+function capitaliseFirstLetter(string)
+{
+    return string.charAt(0).toUpperCase() + string.slice(1);
+}
 
 /**
  * Widget code
@@ -132,8 +140,8 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
         this.is_loaded.resolve();
     },
 
-      /** Prepares chart data for javascript library
-       *
+      /**
+       * Prepares chart data for javascript library
        */
     schedule_chart: function(results) { 
         var self = this;
@@ -337,8 +345,12 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
     schedule_bar_line_area: function(data) {
       var options = {};
         var self = this;
-        var group_list,
-        view_chart = (self.chart == 'line')?'line':(self.chart == 'area')?'area':'';
+
+        var view_chart = self.chart;
+
+        if (self.chart == 'bar') {
+          view_chart = (this.orientation === 'horizontal') ? 'bar':'column';
+        }
 
         // Get appropriate google data
         if (this.group_field)
@@ -348,16 +360,16 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
 
         if (!this.group_field) { // XXXvlab: || !data.length) {
 
-            if (self.chart == 'bar'){
-                view_chart = (this.orientation === 'horizontal') ? 'barH' : 'bar';
+            if (self.chart == 'bar') {
+              view_chart = (this.orientation === 'horizontal') ? 'bar':'column';
             }
-            group_list = _(this.columns).map(function (column, index) {
-                return {
-                    group: column.name,
-                    text: self.fields[column.name].string,
-                    // color: COLOR_PALETTE[index % (COLOR_PALETTE.length)]
-                }
-            });
+            // group_list = _(this.columns).map(function (column, index) {
+            //     return {
+            //         group: column.name,
+            //         text: self.fields[column.name].string,
+            //         // color: COLOR_PALETTE[index % (COLOR_PALETTE.length)]
+            //     }
+            // });
         } else {
             // dhtmlx handles clustered bar charts (> 1 column per abscissa
             // value) and stacked bar charts (basically the same but with the
@@ -372,7 +384,7 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
             }
             // transform series for clustered charts into series for stacked
             // charts
-            if (self.chart == 'bar'){
+            if (self.chart == 'bar') {
               options['isStacked'] = true;
             }
 
@@ -404,14 +416,14 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
             title: "<b>" + this.fields[this.ordinate].string + "</b>"
         };
 
-        var x_axis, y_axis;
-        if (self.chart == 'bar' && self.orientation == 'horizontal') {
-            x_axis = ordinate_description;
-            y_axis = abscissa_description;
-        } else {
-            x_axis = abscissa_description;
-            y_axis = ordinate_description;
-        }
+        // var x_axis, y_axis;
+        // if (self.chart == 'bar' && self.orientation == 'horizontal') {
+        //     x_axis = ordinate_description;
+        //     y_axis = abscissa_description;
+        // } else {
+        //     x_axis = abscissa_description;
+        //     y_axis = ordinate_description;
+        // }
         var renderer = function () {
             if (self.$element.is(':hidden')) {
                 self.renderer = setTimeout(renderer, 100);
@@ -419,8 +431,10 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
             }
             self.renderer = null;
 
-            var chart = new google.visualization.ColumnChart(
+            var google_widget = google.visualization[capitaliseFirstLetter(view_chart) + "Chart"];
+            var chart = new google_widget(
                 document.getElementById(self.widget_parent.element_id+"-"+self.chart+"chart"));
+
             chart.draw(data, options);
             // var charts = new dhtmlXChart({
             //     view: view_chart,
