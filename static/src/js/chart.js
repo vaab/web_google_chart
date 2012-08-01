@@ -210,11 +210,7 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
         });
 
 
-        if (_.include(['bar','line','area'], this.chart)) {
-            return this.schedule_bar_line_area(records);
-        } else if (this.chart == "pie") {
-            return this.schedule_pie(records);
-        }
+        return this.schedule_widget_draw(records);
     },
 
     g_column_type: function(field) {
@@ -362,18 +358,19 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
         return data;
     },
 
-    schedule_bar_line_area: function(data) {
+    schedule_widget_draw: function(records) {
 
         var self = this;
         var options = {};             // google chart options associative array
         var view_chart = self.chart;  // google chart widget name
+        var data;  // will hold google data object
 
         if (self.chart == 'bar') {
           view_chart = (this.orientation === 'horizontal') ? 'bar':'column';
         }
 
-        if (!this.group_field || !data.length) {
-            data = this.prepare_data_bar(data);
+        if (!this.group_field || !records.length) {
+            data = this.prepare_data_bar(records);
         } else {
             // google chart handles clustered bar charts (> 1 column per abscissa
             // value) and stacked bar charts (basically the same but with the
@@ -391,7 +388,7 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
             if (self.chart == 'bar') {
               options['isStacked'] = true;
             }
-            data = this.prepare_data_grouped_bar(data);
+            data = this.prepare_data_grouped_bar(records);
         }
 
         var renderer = function () {
@@ -416,38 +413,8 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
  
         if (this.renderer) {
             clearTimeout(this.renderer);
-        }
-
-        this.renderer = setTimeout(renderer, 0);
-    },
-
-    schedule_pie: function(records) {
-
-      var self = this;
-      var options = {};
-
-      var renderer = function () {
-
-            if (self.$element.is(':hidden')) {
-                self.renderer = setTimeout(renderer, 100);
-                return;
-            }
-
-            self.renderer = null;
-
-            data = self.prepare_data_bar(records);
-
-            var chart = new google.visualization.PieChart(
-                  document.getElementById(self.widget_parent.element_id+'-piechart'));
-
-            chart.draw(data, options);
-            // chart.attachEvent("onItemClick", function(id) {
-            //     self.open_list_view(chart.get(id));
-            // });
         };
-        if (this.renderer) {
-            clearTimeout(this.renderer);
-        }
+
         this.renderer = setTimeout(renderer, 0);
     },
 
