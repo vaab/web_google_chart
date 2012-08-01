@@ -259,6 +259,9 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
             return groups_label[group];
         });
 
+        self.abscissas = abscissas; // keeping this for selection purpose
+        self.groups = groups;       // keeping this for selection purpose
+
         graph_data = _(abscissas).map(function(abscissa) {
             var line = graph_data[abscissa];
 
@@ -354,6 +357,7 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
               });
           });
 
+        self.abscissas = _(rows).map(function(elt) { return elt[0] }); // keeping this for selection purpose
         data.addRows(rows);
         return data;
     },
@@ -403,12 +407,9 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
                 document.getElementById(self.widget_parent.element_id+"-"+self.chart+"chart"));
 
             chart.draw(data, options);
-
-            // self.$element.find("#"+self.widget_parent.element_id+"-"+self.chart+"chart").height(
-            //     self.$element.find("#"+self.widget_parent.element_id+"-"+self.chart+"chart").height()+50);
-            // charts.attachEvent("onItemClick", function(id) {
-            //     self.open_list_view(charts.get(id));
-            // });
+            google.visualization.events.addListener(chart, 'select', function() {
+                self.open_list_view(chart.getSelection());
+              });
         };
  
         if (this.renderer) {
@@ -418,36 +419,71 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
         this.renderer = setTimeout(renderer, 0);
     },
 
-    open_list_view : function (id){
-        debugger;
-        var self = this;
-        // unconditionally nuke tooltips before switching view
-        $(".dhx_tooltip").remove('div');
-        id = id[this.abscissa];
-        if(this.fields[this.abscissa].type == "selection"){
-            id = _.detect(this.fields[this.abscissa].selection,function(select_value){
-                return _.include(select_value, id);
-            });
-        }
-        if (typeof id == 'object'){
-            id = id[0];
-        }
+    open_list_view : function (select_info){
 
-        var views;
-        if (this.widget_parent.action) {
-            views = this.widget_parent.action.views;
-            if (!_(views).detect(function (view) {
-                    return view[1] === 'list' })) {
-                views = [[false, 'list']].concat(views);
-            }
-        } else {
-            views = _(["list", "form", "graph"]).map(function(mode) {
-                return [false, mode];
-            });
+      var self = this;
+
+      if (!select_info || (select_info.length != 1))
+        return;
+
+      var select_obj = select_info[0];
+      var abscissa_value, group_value;
+
+      if (typeof(select_obj.row) !== "undefined") {
+        abscissa_value = self.abscissas[select_obj.row];
+      };
+      if (typeof(select_obj.column) !== "undefined") {
+        group_value = self.groups[select_obj.column];
+      };
+
+      // interpreting abscissa value
+      // debugger;
+      // if(this.fields[this.abscissa].type == "selection") {
+      //   id = _.detect(this.fields[this.abscissa].selection,function(select_value){
+      //       return _.include(select_value, id);
+      //     });
+      // };
+
+      // if (!_.include(['selection', 'integer', 'char'], this.fields[this.abscissa].type)){
+      //   throw new Error(
+      //                   "Not implemented Error: type " + this.fields[this.abscissa].type 
+      //                   + " as abscissa can't be listened. (field: " + this.abscissa + ")");
+      // };
+
+      // // interpreting group value
+      // if(this.fields[this.group_field].type == "selection") {
+      //   id = _.detect(this.fields[this.group_field].selection, function(select_value) {
+      //       return _.include(select_value, id);
+      //     });
+      // };
+
+      // if (!_.include(['selection', 'integer', 'char'], this.fields[this.group_field].type)) {
+      //   throw new Error(
+      //                   "Not implemented Error: type " + this.fields[this.group_field].type
+      //                   + " as abscissa can't be listened. (field: " + this.group_field + ")");
+      // };
+
+      debugger;
+      var views;
+      if (this.widget_parent.action) {
+        views = this.widget_parent.action.views;
+        if (!_(views).detect(function (view) {return view[1] === 'list' })) {
+          views = [[false, 'list']].concat(views);
         }
-        this.do_action({
-            res_model : this.dataset.model,
-            domain: [[this.abscissa, '=', id], ['id','in',this.dataset.ids]],
+      } else {
+        views = _(["list", "form", "graph"]).map(function(mode) {
+            return [false, mode];
+          });
+      };
+
+      var domain =  [[this.abscissa, '=', abscissa_value], ['id','in',this.dataset.ids]];
+      if (typeof(group_value) !== "undefined") {
+        domain = domain.concat([[this.group_field, '=', group_value]]);
+      };
+
+      this.do_action({
+        res_model: this.dataset.model,
+            'domain': domain,
             views: views,
             type: "ir.actions.act_window",
             flags: {default_view: 'list'}
