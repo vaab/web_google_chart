@@ -49,6 +49,12 @@ function capitaliseFirstLetter(string) {
     return string.charAt(0).toUpperCase() + string.slice(1);
 }
 
+function mk_field_key(field) {
+  return field + ":id";
+}
+
+
+
 /**
  * Widget code
  */
@@ -139,6 +145,19 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
         this.is_loaded.resolve();
     },
 
+
+      /**
+       * Return the fieldname that should be used to store/retrieve
+       * the key used when grouping
+       */
+    _field_key_label: function(field) {
+      if (typeof this.fields[field]  === "undefined")
+        return field;
+      if (_.include(["selection", "many2one"], this.fields[field].type)) 
+        return mk_field_key(field);
+      return field; // no need to get a special key. The value is a literal.
+    },
+
       /**
        * Prepares chart data for javascript library
        */
@@ -158,7 +177,11 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
             var point = {};
             _(result).each(function (value, field) {
                 if (!_(fields).contains(field)) { return; }
-                if (value === false) { point[field] = false; return; }
+                if (value === false) { 
+                  point[field] = false; 
+                  point[mk_field_key(field)] = false;
+                  return; 
+                }
                 switch (self.fields[field].type) {
                 case 'selection':
                     var select = _(self.fields[field].selection).detect(function (choice) {
@@ -166,12 +189,12 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
                       });
                     point[field] = select[1];
                     // storing id to keep a good grouping key
-                    print[field + ':id'] = select[0];
+                    point[mk_field_key(field)] = select[0];
                     break;
                 case 'many2one':
                     point[field] = value[1];
                     // storing id to keep a good grouping key
-                    point[field + ':id'] = value[0];
+                    point[mk_field_key(field)] = value[0];
                     break;
                 case 'integer': case 'float': case 'char':
                 case 'date': case 'datetime':
@@ -207,24 +230,23 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
         var abscissas = []; // list of different abscissas values
         var groups = [];    // list of different group values
         var groups_label = {}; // store association of id -> label for group if any
-        var group_field = (records.length > 0 && 
-                           records[0][self.group_field + ':id'])?self.group_field + ':id':self.group_field;
+        var group_key_field = self._field_key_label(self.group_field);
         var column = self.columns[0]; // XXXvlab: could we have multi-columns here ?
         _(records).each(function (record) {
 
             var abscissa = record[self.abscissa],
-              group = record[group_field];
+              group_key = record[group_key_field];
 
             if (!_.include(abscissas, abscissa)) abscissas.push(abscissa);
-            if (!_.include(groups, group)) {
-              groups.push(group);
-              groups_label[group] = record[self.group_field];
+            if (!_.include(groups, group_key)) {
+              groups.push(group_key);
+              groups_label[group_key] = record[self.group_field]?record[self.group_field]:"unspecified";
             };
 
             if (!graph_data[abscissa])        graph_data[abscissa] = {}
-            if (!graph_data[abscissa][group]) graph_data[abscissa][group] = {}
+            if (!graph_data[abscissa][group_key]) graph_data[abscissa][group_key] = {}
 
-            var datapoint = graph_data[abscissa][group];
+            var datapoint = graph_data[abscissa][group_key];
 
             // _(self.columns).each(function (column) {
                 var val = record[column.name],
@@ -271,24 +293,23 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
         // max m*n records where m is the # of values for the abscissa
         // and n is the # of values for the group field
         var graph_data = [];
-        var group_field = (records.length > 0 && 
-                           records[0][self.group_field + ':id'])?self.group_field + ':id':self.group_field;
+        var group_key_field = self._field_key_label(self.group_field);
 
         _(records).each(function (record) {
 
             var abscissa = record[self.abscissa],
-                group = record[group_field];
+                group_key = record[group_key_field];
             var r = _(graph_data).detect(function (potential) {
                 return potential[self.abscissa] === abscissa
-                        && (!group_field
-                            || potential[group_field] === group);
+                        && (!group_key_field
+                            || potential[group_key_field] === group_key);
             });
             var datapoint = r || {};
 
             datapoint[self.abscissa] = abscissa;
-            if (group_field) { 
-                datapoint[group_field] = group; 
-                if (self.group_field !== group_field)
+            if (group_key_field) { 
+                datapoint[group_key_field] = group_key; 
+                if (self.group_field !== group_key_field)
                   datapoint[self.group_field] = record[self.group_field];
             }
             _(self.columns).each(function (column) {
