@@ -307,15 +307,10 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
         var abscissas_label = {};
         var abscissas = [];
         var abscissa_key_fieldname = self._field_key_label(self.abscissa);
-        var group_key_fieldname = self._field_key_label(self.group_field);
         
-        if (group_key_fieldname) 
-          debugger;
-
         _(records).each(function (record) {
 
-            var abscissa_key = record[abscissa_key_fieldname],
-                group_key    = record[group_key_fieldname];
+            var abscissa_key = record[abscissa_key_fieldname];
 
             if (!_.include(abscissas, abscissa_key)) {
               abscissas.push(abscissa_key);
@@ -324,18 +319,11 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
 
             var r = _(graph_data).detect(function (potential) {
                 // XXXvlab: it seems that goup_key_field can't be set here ?
-                return potential[abscissa_key_fieldname] === abscissa_key
-                        && (!group_key_fieldname
-                            || potential[group_key_fieldname] === group_key);
+                return potential[abscissa_key_fieldname] === abscissa_key;
             });
             var datapoint = r || {};
 
             datapoint[abscissa_key_fieldname] = abscissa_key;
-            // if (group_key_fieldname) { 
-            //     datapoint[group_key_fieldname] = group_key; 
-            //     if (self.group_field !== group_key_fieldname)
-            //       datapoint[self.group_field] = record[self.group_field];
-            // }
             _(self.columns).each(function (column) {
                 var val = record[column.name],        // value to accumulate
                   aggregate = datapoint[column.name]; // previous value of accumulator
@@ -344,9 +332,8 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
 
             if (!r) { graph_data.push(datapoint); }
         });
-        graph_data = _(graph_data).sortBy(function (point) {
-            return point[abscissa_key_fieldname] + '[[--]]' + point[self.group_field];
-        });
+
+        graph_data = _(graph_data).sortBy(function (point) { return point[abscissa_key_fieldname]; });
 
         /* Convert to google data containuer
          *
@@ -356,7 +343,6 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
         // ensure the abscissa is first column
         var columns_name = [self.abscissa].concat(_(this.columns).pluck("name"));
         var columns_keys = [abscissa_key_fieldname].concat(_(this.columns).pluck("name"));
-        // if (this.group_field) { columns.push(this.group_field); }
 
         var types = {}
         _(columns_name).each(function (field) {
