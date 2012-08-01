@@ -424,50 +424,21 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
     },
 
     open_list_view : function (select_info){
-
       var self = this;
 
       if (!select_info || (select_info.length != 1))
         return;
 
       var select_obj = select_info[0];
-      var abscissa_value, group_value;
+      var abscissa_key, group_key;
 
       if (typeof(select_obj.row) !== "undefined") {
-        abscissa_value = self.abscissas[select_obj.row];
+        abscissa_key = self.abscissas[select_obj.row];
       };
       if (typeof(select_obj.column) !== "undefined") {
-        group_value = self.groups[select_obj.column];
+        group_key = self.groups[select_obj.column];
       };
 
-      // interpreting abscissa value
-      // debugger;
-      // if(this.fields[this.abscissa].type == "selection") {
-      //   id = _.detect(this.fields[this.abscissa].selection,function(select_value){
-      //       return _.include(select_value, id);
-      //     });
-      // };
-
-      // if (!_.include(['selection', 'integer', 'char'], this.fields[this.abscissa].type)){
-      //   throw new Error(
-      //                   "Not implemented Error: type " + this.fields[this.abscissa].type 
-      //                   + " as abscissa can't be listened. (field: " + this.abscissa + ")");
-      // };
-
-      // // interpreting group value
-      // if(this.fields[this.group_field].type == "selection") {
-      //   id = _.detect(this.fields[this.group_field].selection, function(select_value) {
-      //       return _.include(select_value, id);
-      //     });
-      // };
-
-      // if (!_.include(['selection', 'integer', 'char'], this.fields[this.group_field].type)) {
-      //   throw new Error(
-      //                   "Not implemented Error: type " + this.fields[this.group_field].type
-      //                   + " as abscissa can't be listened. (field: " + this.group_field + ")");
-      // };
-
-      debugger;
       var views;
       if (this.widget_parent.action) {
         views = this.widget_parent.action.views;
@@ -480,9 +451,9 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
           });
       };
 
-      var domain =  [[this.abscissa, '=', abscissa_value], ['id','in',this.dataset.ids]];
-      if (typeof(group_value) !== "undefined") {
-        domain = domain.concat([[this.group_field, '=', group_value]]);
+      var domain =  [[this.abscissa, '=', abscissa_key], ['id','in',this.dataset.ids]];
+      if (typeof(group_key) !== "undefined") {
+        domain = domain.concat([[this.group_field, '=', group_key]]);
       };
 
       this.do_action({
