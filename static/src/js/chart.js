@@ -360,10 +360,8 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
 
         var types = {}
         _(columns_name).each(function (field) {
-            var type = "string";
             var oe_type = self.fields[field].type;
-            if (_.include(['integer', 'float'], oe_type))
-              type = "number";
+            var type = self.g_column_type(field);
             types[field] = type;
             data.addColumn(type, self.fields[field].string);
           });
