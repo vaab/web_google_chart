@@ -371,16 +371,7 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
             var abscissa_label = abscissas_label[abscissa_key];
             var columns = _(self.columns).pluck("name");
             return [abscissa_label].concat(_(columns).map(function(field) {
-                switch(types[field]) {
-                  case 'string':
-                    try {
-                      return record[field].toString();
-                    } catch(e) {
-                      debugger;
-                    };
-                case 'number':
                   return record[field];
-                };
                 }));
           });
 
