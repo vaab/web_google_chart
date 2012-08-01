@@ -436,7 +436,9 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
         abscissa_key = self.abscissas[select_obj.row];
       };
       if (typeof(select_obj.column) !== "undefined") {
-        group_key = self.groups[select_obj.column];
+        var idx = select_obj.column;
+        if (this.group_field)  idx--; // first column were labels
+        group_key = self.groups[idx];
       };
 
       var views;
