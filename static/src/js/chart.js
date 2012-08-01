@@ -166,12 +166,12 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
                       });
                     point[field] = select[1];
                     // storing id to keep a good grouping key
-                    print[field + '__id'] = select[0];
+                    print[field + ':id'] = select[0];
                     break;
                 case 'many2one':
                     point[field] = value[1];
                     // storing id to keep a good grouping key
-                    point[field + '__id'] = value[0];
+                    point[field + ':id'] = value[0];
                     break;
                 case 'integer': case 'float': case 'char':
                 case 'date': case 'datetime':
@@ -208,7 +208,7 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
         var groups = [];    // list of different group values
         var groups_label = {}; // store association of id -> label for group if any
         var group_field = (records.length > 0 && 
-                           records[0][self.group_field + '__id'])?self.group_field + '__id':self.group_field;
+                           records[0][self.group_field + ':id'])?self.group_field + ':id':self.group_field;
         var column = self.columns[0]; // XXXvlab: could we have multi-columns here ?
         _(records).each(function (record) {
 
@@ -272,7 +272,7 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
         // and n is the # of values for the group field
         var graph_data = [];
         var group_field = (records.length > 0 && 
-                           records[0][self.group_field + '__id'])?self.group_field + '__id':self.group_field;
+                           records[0][self.group_field + ':id'])?self.group_field + ':id':self.group_field;
 
         _(records).each(function (record) {
 
