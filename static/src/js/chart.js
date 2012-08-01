@@ -229,26 +229,34 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
     prepare_data_grouped_bar: function(records) {
       var self = this;
         var graph_data = {};
-        var abscissas = []; // list of different abscissas values
-        var groups = [];    // list of different group values
-        var groups_label = {}; // store association of id -> label for group if any
-        var group_key_field = self._field_key_label(self.group_field);
+        var abscissas = [];       // list of different abscissas keys
+        var abscissas_label = {}; // store association of key -> label for abscissa
+        var groups = [];          // list of different group keys
+        var groups_label = {};    // store association of key -> label for group if any
+
+        var group_key_fieldname    = self._field_key_label(self.group_field);
+        var abscissa_key_fieldname = self._field_key_label(self.abscissa);
+
         var column = self.columns[0]; // XXXvlab: could we have multi-columns here ?
+
         _(records).each(function (record) {
 
-            var abscissa = record[self.abscissa],
-              group_key = record[group_key_field];
+            var abscissa_key = record[abscissa_key_fieldname],
+              group_key = record[group_key_fieldname];
 
-            if (!_.include(abscissas, abscissa)) abscissas.push(abscissa);
-            if (!_.include(groups, group_key)) {
+            if (!_.include(abscissas, abscissa_key)) {
+              abscissas.push(abscissa_key);
+              abscissas_label[abscissa_key] = record[self.abscissa]?record[self.abscissa]:"unspecified";
+            };
+            if (!_.include(groups,    group_key)) {
               groups.push(group_key);
               groups_label[group_key] = record[self.group_field]?record[self.group_field]:"unspecified";
             };
 
-            if (!graph_data[abscissa])        graph_data[abscissa] = {}
-            if (!graph_data[abscissa][group_key]) graph_data[abscissa][group_key] = {}
+            if (!graph_data[abscissa_key])            graph_data[abscissa_key] = {}
+            if (!graph_data[abscissa_key][group_key]) graph_data[abscissa_key][group_key] = {}
 
-            var datapoint = graph_data[abscissa][group_key];
+            var datapoint = graph_data[abscissa_key][group_key];
 
             // _(self.columns).each(function (column) {
                 var val = record[column.name],
@@ -259,20 +267,21 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
 
         });
 
-        abscissas.sort();
         // we want to sort grouped field upon it's real label and not it's numeric id.
-        groups = _(groups).sortBy(function (group) {
-            return groups_label[group];
-        });
+        abscissas = _(abscissas).sortBy(function (key) { return abscissas_label[key]; });
+        groups    = _(groups)   .sortBy(function (key) { return groups_label   [key]; });
 
         self.abscissas = abscissas; // keeping this for selection purpose
-        self.groups = groups;       // keeping this for selection purpose
+        self.groups    = groups;    // keeping this for selection purpose
 
-        graph_data = _(abscissas).map(function(abscissa) {
-            var line = graph_data[abscissa];
+        self.abscissas_label = abscissas_label; // keeping this for selection purpose
+        self.groups_label    = groups_label;    // keeping this for selection purpose
 
-            return [abscissa?abscissa:"unspecified"].concat(_(groups).map(function(group) {
-                  return line[group]?line[group][column.name]:get_agg_neutral(column.operator);
+        graph_data = _(abscissas).map(function(abscissa_key) {
+            var line = graph_data[abscissa_key];
+
+            return [abscissas_label[abscissa_key]].concat(_(groups).map(function(group_key) {
+                  return line[group_key]?line[group_key][column.name]:get_agg_neutral(column.operator);
                 }));
         });
 
@@ -280,13 +289,10 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
          *
          */
 
-        var types = {}
-        types[self.abscissa] = this.g_column_type(self.abscissa);
-        var columns_title = [self.fields[self.abscissa].string];
-
-        _(groups).each(function (group) {
-            columns_title.push(groups_label[group]);
-          });
+        var columns_title = _([self.fields[self.abscissa].string]).concat(
+          _(groups).map(function (group_key) {
+            return groups_label[group_key];
+          }));
 
         return google.visualization.arrayToDataTable([columns_title].concat(graph_data));
     },
@@ -298,35 +304,48 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
         // max m*n records where m is the # of values for the abscissa
         // and n is the # of values for the group field
         var graph_data = [];
-        var group_key_field = self._field_key_label(self.group_field);
+        var abscissas_label = {};
+        var abscissas = [];
+        var abscissa_key_fieldname = self._field_key_label(self.abscissa);
+        var group_key_fieldname = self._field_key_label(self.group_field);
+        
+        if (group_key_fieldname) 
+          debugger;
 
         _(records).each(function (record) {
 
-            var abscissa = record[self.abscissa],
-                group_key = record[group_key_field];
+            var abscissa_key = record[abscissa_key_fieldname],
+                group_key    = record[group_key_fieldname];
+
+            if (!_.include(abscissas, abscissa_key)) {
+              abscissas.push(abscissa_key);
+              abscissas_label[abscissa_key] = record[self.abscissa]?record[self.abscissa]:"unspecified";
+            };
+
             var r = _(graph_data).detect(function (potential) {
-                return potential[self.abscissa] === abscissa
-                        && (!group_key_field
-                            || potential[group_key_field] === group_key);
+                // XXXvlab: it seems that goup_key_field can't be set here ?
+                return potential[abscissa_key_fieldname] === abscissa_key
+                        && (!group_key_fieldname
+                            || potential[group_key_fieldname] === group_key);
             });
             var datapoint = r || {};
 
-            datapoint[self.abscissa] = abscissa;
-            if (group_key_field) { 
-                datapoint[group_key_field] = group_key; 
-                if (self.group_field !== group_key_field)
-                  datapoint[self.group_field] = record[self.group_field];
-            }
+            datapoint[abscissa_key_fieldname] = abscissa_key;
+            // if (group_key_fieldname) { 
+            //     datapoint[group_key_fieldname] = group_key; 
+            //     if (self.group_field !== group_key_fieldname)
+            //       datapoint[self.group_field] = record[self.group_field];
+            // }
             _(self.columns).each(function (column) {
-                var val = record[column.name],
-                    aggregate = datapoint[column.name];
+                var val = record[column.name],        // value to accumulate
+                  aggregate = datapoint[column.name]; // previous value of accumulator
                 datapoint[column.name] = get_agg_fun(column.operator)(aggregate, val);
             });
 
             if (!r) { graph_data.push(datapoint); }
         });
         graph_data = _(graph_data).sortBy(function (point) {
-            return point[self.abscissa] + '[[--]]' + point[self.group_field];
+            return point[abscissa_key_fieldname] + '[[--]]' + point[self.group_field];
         });
 
         /* Convert to google data containuer
@@ -335,11 +354,12 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
         var data = new google.visualization.DataTable();
 
         // ensure the abscissa is first column
-        var columns = [self.abscissa].concat(_(this.columns).pluck("name"));
-        if (this.group_field) { columns.push(this.group_field); }
+        var columns_name = [self.abscissa].concat(_(this.columns).pluck("name"));
+        var columns_keys = [abscissa_key_fieldname].concat(_(this.columns).pluck("name"));
+        // if (this.group_field) { columns.push(this.group_field); }
 
         var types = {}
-        _(columns).each(function (field) {
+        _(columns_name).each(function (field) {
             var type = "string";
             var oe_type = self.fields[field].type;
             if (_.include(['integer', 'float'], oe_type))
@@ -349,7 +369,10 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
           });
 
         var rows = _(graph_data).map(function(record) {
-            return _(columns).map(function(field) {
+            var abscissa_key = record[abscissa_key_fieldname];
+            var abscissa_label = abscissas_label[abscissa_key];
+            var columns = _(self.columns).pluck("name");
+            return [abscissa_label].concat(_(columns).map(function(field) {
                 switch(types[field]) {
                   case 'string':
                     try {
@@ -360,10 +383,10 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
                 case 'number':
                   return record[field];
                 };
-              });
+                }));
           });
 
-        self.abscissas = _(rows).map(function(elt) { return elt[0] }); // keeping this for selection purpose
+        self.abscissas = abscissas; // keeping this for selection purpose
         data.addRows(rows);
         return data;
     },
