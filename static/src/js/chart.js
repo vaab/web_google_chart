@@ -175,40 +175,46 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
         // value shapes to usable atomic types
         var records = _(results).map(function (result) {
             var point = {};
-            _(result).each(function (value, field) {
+            _(result).each(function (oe_value, field) {
                 if (!_(fields).contains(field)) { return; }
-                if (value === false) { 
-                  point[field] = false; 
-                  point[mk_field_key(field)] = false;
-                  return; 
-                }
-                switch (self.fields[field].type) {
-                case 'selection':
+                var value,    // transformed javascript value
+                    value_key;  // usable key value if grouping is necessary
+
+                if (oe_value === false) { 
+                  value = false; 
+                  value_key = false;
+                } else {
+                  switch (self.fields[field].type) {
+                  case 'selection':
                     var select = _(self.fields[field].selection).detect(function (choice) {
-                        return choice[0] === value;
+                        return choice[0] === oe_value;
                       });
-                    point[field] = select[1];
-                    // storing id to keep a good grouping key
-                    point[mk_field_key(field)] = select[0];
+                    value = select[1];
+                    value_key = select[0];
                     break;
-                case 'many2one':
-                    point[field] = value[1];
-                    // storing id to keep a good grouping key
-                    point[mk_field_key(field)] = value[0];
+                  case 'many2one':
+                    value = oe_value[1];
+                    value_key = oe_value[0];
                     break;
-                case 'integer': case 'float': case 'char':
-                case 'date': case 'datetime':
-                    point[field] = value;
+                  case 'integer': case 'float': case 'char':
+                  case 'date': case 'datetime':
+                    value = oe_value;
+                    value_key = oe_value;
                     break;
-                default:
+                  default:
                     throw new Error(
-                        "Unknown field type " + self.fields[field].type
-                        + "for field " + field + " (" + value + ")");
-                }
+                                    "Unknown field type " + self.fields[field].type
+                                    + "for field " + field + " (" + oe_value + ")");
+                  }
+                };
+
+                point[field] = value;
+                // storing id to keep a good grouping key
+                if (_.include([self.abscissa, self.group_field], field))
+                  point[mk_field_key(field)] = value_key; 
             });
             return point;
         });
-
 
         return this.schedule_widget_draw(records);
     },
