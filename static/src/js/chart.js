@@ -41,6 +41,7 @@ function get_agg_neutral(op) {
   return get_agg_fun(op)();
 }
 
+
 /**
  * Miscellanious functions
  */
@@ -52,7 +53,6 @@ function capitaliseFirstLetter(string) {
 function mk_field_key(field) {
   return field + ":id";
 }
-
 
 
 /**
@@ -82,9 +82,7 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
     },
 
     stop: function () {
-        if (this.renderer) {
-            clearTimeout(this.renderer);
-        }
+        if (this.renderer) clearTimeout(this.renderer);
         this._super();
     },
 
@@ -118,9 +116,8 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
     list_fields: function () {
         var fs = [this.abscissa];
         fs.push.apply(fs, _(this.columns).pluck('name'));
-        if (this.group_field) {
-            fs.push(this.group_field);
-        }
+        if (this.group_field) fs.push(this.group_field);
+
         return fs;
     },
 
@@ -172,7 +169,7 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
         var fields = _(this.columns).pluck('name').concat([this.abscissa]);
         if (this.group_field) { fields.push(this.group_field); }
         // transform search result into usable records (convert from OpenERP
-        // value shapes to usable atomic types
+        // value shapes to usable atomic types)
         var records = _(results).map(function (result) {
             var point = {};
             _(result).each(function (oe_value, field) {
@@ -211,7 +208,7 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
                 point[field] = value;
                 // storing id to keep a good grouping key
                 if (_.include([self.abscissa, self.group_field], field))
-                  point[mk_field_key(field)] = value_key; 
+                  point[self._field_key_label(field)] = value_key; 
             });
             return point;
         });
@@ -219,6 +216,11 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
         return this.schedule_widget_draw(records);
     },
 
+
+      /**
+       * Returns Google Chart data type for given openerp fieldname
+       *
+       */
     g_column_type: function(field) {
       var oe_type = this.fields[field].type;
       if (_.include(['integer', 'float'], oe_type))
@@ -374,13 +376,12 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
                     'OpenERP Web does not support combining grouping and '
                   + 'multiple columns in graph at this time.');
                 throw new Error(
-                    'dhtmlx can not handle columns counts of that magnitude');
+                    'google chart can not handle columns counts of that magnitude');
             }
             // transform series for clustered charts into series for stacked
             // charts
-            if (self.chart == 'bar') {
-              options['isStacked'] = true;
-            }
+            if (self.chart == 'bar') options['isStacked'] = true;
+
             data = this.prepare_data_grouped_bar(records);
         }
 
@@ -401,9 +402,7 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
               });
         };
  
-        if (this.renderer) {
-            clearTimeout(this.renderer);
-        };
+        if (this.renderer) clearTimeout(this.renderer);
 
         this.renderer = setTimeout(renderer, 0);
     },
