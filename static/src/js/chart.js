@@ -226,72 +226,94 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
       return "string";
     },
 
-    prepare_data_grouped_bar: function(records) {
+      /**
+       * Group records along the given group_fields
+       *
+       * It'll accumulate values of self.columns field according to their operator
+       */
+    group_records: function(records, group_fields) {
+
       var self = this;
-        var graph_data = {};
-        var abscissas = [];       // list of different abscissas keys
-        var abscissas_label = {}; // store association of key -> label for abscissa
-        var groups = [];          // list of different group keys
-        var groups_label = {};    // store association of key -> label for group if any
+      var group_values = {};  // assoc group_field -> list of record values
+      var group_labels = {};   // assoc group_field -> (assoc key -> label)
 
-        var group_key_fieldname    = self._field_key_label(self.group_field);
-        var abscissa_key_fieldname = self._field_key_label(self.abscissa);
-
-        var column = self.columns[0]; // XXXvlab: could we have multi-columns here ?
-
-        _(records).each(function (record) {
-
-            var abscissa_key = record[abscissa_key_fieldname],
-              group_key = record[group_key_fieldname];
-
-            if (!_.include(abscissas, abscissa_key)) {
-              abscissas.push(abscissa_key);
-              abscissas_label[abscissa_key] = record[self.abscissa]?record[self.abscissa]:"unspecified";
-            };
-            if (!_.include(groups,    group_key)) {
-              groups.push(group_key);
-              groups_label[group_key] = record[self.group_field]?record[self.group_field]:"unspecified";
-            };
-
-            if (!graph_data[abscissa_key])            graph_data[abscissa_key] = {}
-            if (!graph_data[abscissa_key][group_key]) graph_data[abscissa_key][group_key] = {}
-
-            var datapoint = graph_data[abscissa_key][group_key];
-
-            // _(self.columns).each(function (column) {
-                var val = record[column.name],
-                    aggregate = datapoint[column.name];
-                datapoint[column.name] = get_agg_fun(column.operator)(aggregate, val);
-                return;
-            // });
-
+      var key_fieldname = {};
+      _(group_fields).each(function (group_field) {
+          key_fieldname[group_field] = self._field_key_label(group_field);
         });
 
-        // we want to sort grouped field upon it's real label and not it's numeric id.
-        abscissas = _(abscissas).sortBy(function (key) { return abscissas_label[key]; });
-        groups    = _(groups)   .sortBy(function (key) { return groups_label   [key]; });
+      var graph_data = {};
+      _(records).each(function (record) {
 
-        self.abscissas = abscissas; // keeping this for selection purpose
-        self.groups    = groups;    // keeping this for selection purpose
+          var group_keys = {};         // assoc group_field -> record value
+          var subdct = graph_data;     // dict pointer
+          _(group_fields).each(function (group_field) {
+              var key = record[key_fieldname[group_field]];
+              group_keys[group_field] = key;
 
-        self.abscissas_label = abscissas_label; // keeping this for selection purpose
-        self.groups_label    = groups_label;    // keeping this for selection purpose
+              if (typeof group_values[group_field] === "undefined") {
+                group_values[group_field] = [];
+                group_labels[group_field] = {};
+              };
+                
+              if (!_.include(group_values[group_field], key)) {
+                
+                group_values[group_field].push(key);
+                group_labels[group_field][key] = record[group_field]?record[group_field]:
+                  _lt("unspecified").toString();
+              };
+              
+              // create sub dict if not existent.
+              if (typeof subdct[key] === "undefined") subdct[key] = {}
 
-        graph_data = _(abscissas).map(function(abscissa_key) {
+              subdct = subdct[key];                 // move subdct pointer to inner dict
+            });
+
+          var datapoint = subdct;
+
+          _(self.columns).each(function (column) {
+              var val       = record[column.name],    // new value to accumulate
+                  aggregate = datapoint[column.name]; // previous value of accumulator
+              datapoint[column.name] = get_agg_fun(column.operator)(aggregate, val);
+          });
+
+      });
+
+      // we want to sort grouped field upon it's real label and not it's numeric id.
+      _(group_fields).each(function (group_field) {
+          group_values[group_field] = _(group_values[group_field]).sortBy(function (key) { 
+              return group_labels[group_field][key]; 
+            });
+        });
+      
+      this.group_values = group_values; // save for selection purpose
+      this.group_labels = group_labels; // save for column titles
+
+      return graph_data;
+    },
+
+    prepare_data_grouped_bar: function(records) {
+      var self = this;
+
+        var graph_data = this.group_records(records, [this.abscissa, this.group_field]);
+
+        var column = self.columns[0]; // ONLY ONE column is supported for now.
+
+        /*
+         * Convert to google data container format
+         */
+
+        graph_data = _(self.group_values[this.abscissa]).map(function(abscissa_key) {
             var line = graph_data[abscissa_key];
-
-            return [abscissas_label[abscissa_key]].concat(_(groups).map(function(group_key) {
+            return [self.group_labels[self.abscissa][abscissa_key]].concat(
+                _(self.group_values[self.group_field]).map(function(group_key) {
                   return line[group_key]?line[group_key][column.name]:get_agg_neutral(column.operator);
                 }));
         });
 
-        /* Convert to google data containuer
-         *
-         */
-
-        var columns_title = _([self.fields[self.abscissa].string]).concat(
-          _(groups).map(function (group_key) {
-            return groups_label[group_key];
+        var columns_title = _([self.fields[this.abscissa].string]).concat(
+          _(this.group_values[this.group_field]).map(function (group_key) {
+            return self.group_labels[self.group_field][group_key];
           }));
 
         return google.visualization.arrayToDataTable([columns_title].concat(graph_data));
@@ -300,68 +322,31 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
     prepare_data_bar: function(records) {
       var self = this;
       
-        // Aggregate on abscissa field, leave split on group field =>
-        // max m*n records where m is the # of values for the abscissa
-        // and n is the # of values for the group field
-        var graph_data = [];
-        var abscissas_label = {};
-        var abscissas = [];
-        var abscissa_key_fieldname = self._field_key_label(self.abscissa);
-        
-        _(records).each(function (record) {
+      var graph_data = this.group_records(records, [this.abscissa, ]);
 
-            var abscissa_key = record[abscissa_key_fieldname];
-
-            if (!_.include(abscissas, abscissa_key)) {
-              abscissas.push(abscissa_key);
-              abscissas_label[abscissa_key] = record[self.abscissa]?record[self.abscissa]:"unspecified";
-            };
-
-            var r = _(graph_data).detect(function (potential) {
-                // XXXvlab: it seems that goup_key_field can't be set here ?
-                return potential[abscissa_key_fieldname] === abscissa_key;
-            });
-            var datapoint = r || {};
-
-            datapoint[abscissa_key_fieldname] = abscissa_key;
-            _(self.columns).each(function (column) {
-                var val = record[column.name],        // value to accumulate
-                  aggregate = datapoint[column.name]; // previous value of accumulator
-                datapoint[column.name] = get_agg_fun(column.operator)(aggregate, val);
-            });
-
-            if (!r) { graph_data.push(datapoint); }
-        });
-
-        graph_data = _(graph_data).sortBy(function (point) { return point[abscissa_key_fieldname]; });
-
-        /* Convert to google data containuer
-         *
+        /*
+         * Convert to google data containuer
          */
         var data = new google.visualization.DataTable();
 
         // ensure the abscissa is first column
         var columns_name = [self.abscissa].concat(_(this.columns).pluck("name"));
-        var columns_keys = [abscissa_key_fieldname].concat(_(this.columns).pluck("name"));
 
-        var types = {}
         _(columns_name).each(function (field) {
             var oe_type = self.fields[field].type;
             var type = self.g_column_type(field);
-            types[field] = type;
             data.addColumn(type, self.fields[field].string);
           });
 
-        var rows = _(graph_data).map(function(record) {
-            var abscissa_key = record[abscissa_key_fieldname];
-            var abscissa_label = abscissas_label[abscissa_key];
+        var rows = _(self.group_values[this.abscissa]).map(function(key) {
+            var record = graph_data[key];
+            var abscissa_label = self.group_labels[self.abscissa][key];
             var columns = _(self.columns).pluck("name");
             return [abscissa_label].concat(_(columns).map(function(field) {
                   return record[field];
                 }));
           });
 
-        self.abscissas = abscissas; // keeping this for selection purpose
         data.addRows(rows);
         return data;
     },
@@ -433,11 +418,10 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
       var abscissa_key, group_key;
 
       if (typeof(select_obj.row) !== "undefined") {
-        abscissa_key = self.abscissas[select_obj.row];
+        abscissa_key = this.group_values[this.abscissa][select_obj.row];
       };
-      if ((typeof(select_obj.column) !== "undefined") && 
-          this.group_field) {
-        group_key = self.groups[select_obj.column - 1]; // first column were labels
+      if ((typeof(select_obj.column) !== "undefined") && this.group_field) {
+        group_key = self.group_values[this.group_field][select_obj.column - 1]; // first column were labels
       };
 
       var views;
