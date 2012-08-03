@@ -150,7 +150,7 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
     _field_key_label: function(field) {
       if (typeof this.fields[field]  === "undefined")
         return field;
-      if (_.include(["selection", "many2one"], this.fields[field].type)) 
+      if (_.include(["selection", "many2one"], this.fields[field].type))
         return mk_field_key(field);
       return field; // no need to get a special key. The value is a literal.
     },
@@ -158,7 +158,7 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
       /**
        * Prepares chart data for javascript library
        */
-    schedule_chart: function(results) { 
+    schedule_chart: function(results) {
         var self = this;
         this.$element.html(QWeb.render("GoogleChartView", {
             "fields_view": this.fields_view,
@@ -177,8 +177,8 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
                 var value,    // transformed javascript value
                     value_key;  // usable key value if grouping is necessary
 
-                if (oe_value === false) { 
-                  value = false; 
+                if (oe_value === false) {
+                  value = false;
                   value_key = false;
                 } else {
                   switch (self.fields[field].type) {
@@ -208,7 +208,7 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
                 point[field] = value;
                 // storing id to keep a good grouping key
                 if (_.include([self.abscissa, self.group_field], field))
-                  point[self._field_key_label(field)] = value_key; 
+                  point[self._field_key_label(field)] = value_key;
             });
             return point;
         });
@@ -257,13 +257,13 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
                 group_values[group_field] = [];
                 group_labels[group_field] = {};
               };
-                
+
               if (!_.include(group_values[group_field], key)) {
                 group_values[group_field].push(key);
                 group_labels[group_field][key] = record[group_field]?record[group_field]:
                   _t("unspecified");
               };
-              
+
               // create sub dict if not existent.
               if (typeof subdct[key] === "undefined") subdct[key] = {}
 
@@ -282,11 +282,11 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
 
       // we want to sort grouped field upon it's real label and not it's numeric id.
       _(group_fields).each(function (group_field) {
-          group_values[group_field] = _(group_values[group_field]).sortBy(function (key) { 
-              return group_labels[group_field][key]; 
+          group_values[group_field] = _(group_values[group_field]).sortBy(function (key) {
+              return group_labels[group_field][key];
             });
         });
-      
+
       this.group_values = group_values; // save for selection purpose
       this.group_labels = group_labels; // save for column titles
 
@@ -322,7 +322,7 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
 
     prepare_data_bar: function(records) {
       var self = this;
-      
+
       var graph_data = this.group_records(records, [this.abscissa, ]);
 
         /*
@@ -400,7 +400,7 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
                 self.open_list_view(chart.getSelection());
               });
         };
- 
+
         if (this.renderer) clearTimeout(this.renderer);
 
         this.renderer = setTimeout(renderer, 0);
