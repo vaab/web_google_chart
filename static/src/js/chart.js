@@ -391,7 +391,11 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
             }
             self.renderer = null;
 
-            var google_widget = google.visualization[capitaliseFirstLetter(view_chart) + "Chart"];
+            var google_widget;
+            if (view_chart == "gauge")
+              google_widget = google.visualization[capitaliseFirstLetter(view_chart)];
+            else
+              google_widget = google.visualization[capitaliseFirstLetter(view_chart) + "Chart"];
             var chart = new google_widget(
                 document.getElementById(self.widget_parent.element_id+"-"+self.chart+"chart"));
 

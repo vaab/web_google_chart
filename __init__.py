@@ -21,7 +21,7 @@ insert_js('https://www.google.com/jsapi')
 import re
 main.html_template = re.sub(r'(\$\(function\(\) {(.|\n)*}\);)', r'''
 
-        google.load("visualization", "1", {packages:["corechart"]});
+        google.load("visualization", "1", {packages:["corechart", "gauge"]});
         google.setOnLoadCallback(function() {
             \1
         });
