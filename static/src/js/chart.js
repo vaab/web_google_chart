@@ -5,8 +5,8 @@
 openerp.web_google_chart = function (oe) {
 
 var QWeb = oe.web.qweb,
-     _lt = oe.web._lt;
-
+    _t  = oe.web._t,
+    _lt = oe.web._lt;
 
 /**
  * Aggregate Functions
@@ -259,10 +259,9 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
               };
                 
               if (!_.include(group_values[group_field], key)) {
-                
                 group_values[group_field].push(key);
                 group_labels[group_field][key] = record[group_field]?record[group_field]:
-                  _lt("unspecified").toString();
+                  _t("unspecified");
               };
               
               // create sub dict if not existent.
