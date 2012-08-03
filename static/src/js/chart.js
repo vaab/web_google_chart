@@ -79,6 +79,7 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
         this.is_loaded = $.Deferred();
 
         this.renderer = null;
+        this.options = {}; // googcle chart options
     },
 
     stop: function () {
@@ -121,11 +122,33 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
         return fs;
     },
 
+      read_options_from_html: function (field) {
+      // quick solution that should be thought through much more deeper
+      var options;
+      _.each(field.children, function(f) {
+          if (f.tag == "graph-options") {
+            // Eval returns last object
+            options = eval("x = " + f.children[0]);
+          };
+        })
+        return options
+    },
+
     on_loaded: function() {
         this.chart = this.fields_view.arch.attrs.type || 'pie';
         this.orientation = this.fields_view.arch.attrs.orientation || 'vertical';
 
         _.each(this.fields_view.arch.children, function (field) {
+            // arch rng stipulates that you could provide 'html'
+            // elements that should definitely not be treated as
+            // fields
+            if (field.tag != "field") {
+              // instead we'll use them to store specific google graph options
+              if (field.tag == "html")
+                this.options = this.read_options_from_html(field);
+              return;
+            };
+
             var attrs = field.attrs;
             if (attrs.group) {
                 this.group_field = attrs.name;
@@ -355,7 +378,7 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
     schedule_widget_draw: function(records) {
 
         var self = this;
-        var options = {};             // google chart options associative array
+        var options = this.options;             // google chart options associative array
         var view_chart = self.chart;  // google chart widget name
         var data;  // will hold google data object
 
