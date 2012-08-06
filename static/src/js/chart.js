@@ -392,6 +392,26 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
         if (self.chart == 'bar') {
           view_chart = (this.orientation === 'horizontal') ? 'bar':'column';
         }
+        if (self.chart == 'pyramid') {
+          // inverting second values
+          if (this.columns.length != 2)
+            throw new Error('pyramid type only support 2 value columns.' +
+                            'You\'ve provided '+ this.columns.length +' colums (' + 
+                            _(this.columns).pluck('name').join(", ") +  ')');
+          var label = this.columns[1].name;
+          _(records).each(function(record) {
+              record[label] = -record[label];
+            });
+
+          view_chart = 'bar';
+          options['isStacked'] = true;
+          if (typeof options['hAxis'] === "undefined")
+            options['hAxis'] = {};
+          options['hAxis']['format'] = ';';
+          if (typeof options['vAxis'] === "undefined")
+            options['vAxis'] = {};
+          options['vAxis']['direction'] = '-1';
+        }
 
         if (!this.group_field || !records.length) {
             data = this.prepare_data_bar(records);
@@ -413,6 +433,11 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
 
             data = this.prepare_data_grouped_bar(records);
         }
+
+        if (self.chart == 'pyramid') {
+          var formatter = new google.visualization.NumberFormat({ pattern: ';' });
+          formatter.format(data, 2);
+        };
 
         var renderer = function () {
             if (self.$element.is(':hidden')) {
