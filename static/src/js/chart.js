@@ -12,6 +12,11 @@ var QWeb = oe.web.qweb,
  * Aggregate Functions
  */
 
+/**
+ * Creates an aggregate function from aggregate2 fun and a neutral value
+ *
+ * This only works with agg_fun(x1, ..., xN) = aggregate2(x1, aggregate2(x2 ... aggregate2(xN-1, xN)...))
+ */
 function make_agg_fun(aggregate2, neutral_value) {
   function agg_fun() {
     if (arguments.length == 0) return neutral_value;
@@ -24,22 +29,24 @@ function make_agg_fun(aggregate2, neutral_value) {
   return agg_fun
 };
 
-function get_agg_fun(op) {
-  switch(op) {
-  case '+':
-    return make_agg_fun(function(a, b) { return a + b; }, 0);
-  case '*':
-    return make_agg_fun(function(a, b) { return a * b; }, 1);
-  case 'min':
-    return make_agg_fun(Math.min, Infinity);
-  case 'max':
-    return make_agg_fun(Math.max, -Infinity);
-  };
-};
+var sum = make_agg_fun(function(a, b) { return a + b; }, 0),
+    mul = make_agg_fun(function(a, b) { return a * b; }, 1),
+    min = make_agg_fun(Math.min, Infinity),
+    max = make_agg_fun(Math.max, -Infinity);
 
-function get_agg_neutral(op) {
-  return get_agg_fun(op)();
-}
+function count() { return arguments.length; }
+function avg()   { return sum.apply(this, arguments) / count.apply(this, arguments); }
+function id(x)   { return x; }
+
+var agg_funs = {
+  undefined: id, // No aggregates
+  '+': sum,
+  '*': mul,
+  'min': min,
+  'max': max,
+  '#': count,
+  'avg': avg,
+};
 
 
 /**
@@ -298,7 +305,7 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
           _(self.columns).each(function (column) {
               var val       = record[column.name],    // new value to accumulate
                   aggregate = datapoint[column.name]; // previous value of accumulator
-              datapoint[column.name] = get_agg_fun(column.operator)(aggregate, val);
+              datapoint[column.name] = [val].concat((typeof aggregate !== "undefined")?aggregate:[]);
           });
 
       });
@@ -331,7 +338,8 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
             var line = graph_data[abscissa_key];
             return [self.group_labels[self.abscissa][abscissa_key]].concat(
                 _(self.group_values[self.group_field]).map(function(group_key) {
-                  return line[group_key]?line[group_key][column.name]:get_agg_neutral(column.operator);
+                    return agg_funs[column.operator].apply(
+                        this, (line[group_key]?line[group_key][column.name]:[]));
                 }));
         });
 
@@ -365,9 +373,8 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
         var rows = _(self.group_values[this.abscissa]).map(function(key) {
             var record = graph_data[key];
             var abscissa_label = self.group_labels[self.abscissa][key];
-            var columns = _(self.columns).pluck("name");
-            return [abscissa_label].concat(_(columns).map(function(field) {
-                  return record[field];
+            return [abscissa_label].concat(_(self.columns).map(function(column) {
+                  return agg_funs[column.operator].apply(this, record[column.name]);
                 }));
           });
 
