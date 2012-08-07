@@ -455,9 +455,19 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
                 document.getElementById(self.widget_parent.element_id+"-"+self.chart+"chart"));
 
             chart.draw(data, options);
-            google.visualization.events.addListener(chart, 'select', function() {
-                self.open_list_view(chart.getSelection());
-              });
+
+            if (view_chart == "gauge") {
+              // Gauge's do not support classic google events
+              _(self.$element.find('iframe')).each(function(elt, idx) {
+                  $(elt).contents().find('body').click(function (event) {
+                      self.open_list_view([{'row': idx}]);
+                    });
+                });
+            } else {
+              google.visualization.events.addListener(chart, 'select', function() {
+                  self.open_list_view(chart.getSelection());
+                });
+            };
         };
 
         if (this.renderer) clearTimeout(this.renderer);
