@@ -1,6 +1,8 @@
 /*---------------------------------------------------------
  * OpenERP web_google_chart
  *---------------------------------------------------------*/
+google_jsapi_loaded = false; 
+google_visualization_loaded = false;
 
 openerp.web_google_chart = function (oe) {
 
@@ -94,6 +96,57 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
         this._super();
     },
 
+    load_google_lib: function () {
+        if (typeof(google) !== "undefined") {
+            return $.Deferred().resolve(); // nothing to do
+        }
+
+        if (google_jsapi_loaded !== false) {
+            // this is the deferred which will resolve itself when
+            // google jsapi will be loaded.
+            return google_jsapi_loaded;
+        }
+        // is it the global one we are changing ?
+        google_jsapi_loaded = $.Deferred();
+        window.ginit = function() {
+            google_jsapi_loaded.resolve(); 
+        };
+        console.log('Loading Google jsapi.');
+        $.getScript('//www.google.com/jsapi' +
+                    '?sensor=false&async=true&callback=ginit');
+        return google_jsapi_loaded;
+    },
+
+    load_google_visualization_pkgs: function (pkgs) {
+        var pkgs_loaded = $.Deferred();
+        this.load_google_lib().then(function() {
+
+            if (typeof(google.visualization) !== "undefined") {
+                pkgs_loaded.resolve();
+                return;
+            }
+
+            if (google_visualization_loaded === false) {
+
+                google_visualization_loaded = $.Deferred();
+                console.log('Loading Google visualization pkgs:  ' + pkgs.join(', '));
+                // google.setOnLoadCallback();
+                google.load("visualization", "1", {
+                    packages: pkgs,
+                    callback: function() {
+                        google_visualization_loaded.resolve ();
+                    }
+                });
+            };
+
+            google_visualization_loaded.then(function() { 
+                pkgs_loaded.resolve()
+            });
+
+        });
+        return pkgs_loaded;
+    },
+
     start: function() {
         var self = this;
         this._super();
@@ -110,7 +163,8 @@ oe.web_google_chart.ChartView = oe.web.View.extend({
         }
         return $.when(
             this.dataset.call_and_eval('fields_get', [false, {}], null, 1),
-            loaded)
+            loaded,
+            this.load_google_visualization_pkgs(["corechart", "gauge"]))
             .then(function (fields_result, view_result) {
                 self.fields = fields_result[0];
                 self.fields_view = view_result[0];
