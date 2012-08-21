@@ -335,6 +335,9 @@ openerp.web_google_chart = function (oe) {
                 key_fieldname[group_field] = self._field_key_label(group_field);
             });
 
+            var agg_field_labels = _(agg_fields).pluck('name');
+
+            var datapoints = []; // list of different data points
             var graph_data = {};
             _(records).each(function (record) {
 
@@ -362,21 +365,37 @@ openerp.web_google_chart = function (oe) {
                 });
 
                 var datapoint = subdct;
+                if (typeof datapoint[agg_fields[0].name] === "undefined") { // new datapoint
+                    datapoints.push(datapoint);
+                };
 
-                _(agg_fields).each(function (agg_field) {
-                    var val       = record[agg_field];    // new value to accumulate
-                    var aggregate = datapoint[agg_field]; // previous value of accumulator
-                    datapoint[agg_field] = [val].concat((typeof aggregate !== "undefined")?aggregate:[]);
+                _(agg_field_labels).each(function (agg_field_label) {
+                    var val       = record[agg_field_label];    // new value to accumulate
+                    var aggregate = datapoint[agg_field_label]; // previous value of accumulator
+                    datapoint[agg_field_label] = [val].concat(
+                        (typeof aggregate !== "undefined")?aggregate:[]);
                 });
 
             });
 
-            // we want to sort grouped field upon their real label and not it's numeric id.
+            // we want to sort grouped field upon their real label and not its numeric id.
             _(group_fields).each(function (group_field) {
                 group_values[group_field] = _(group_values[group_field]).sortBy(function (key) {
                     return group_labels[group_field][key];
                 });
             });
+
+            // Apply the aggregation function to full list of values, this allows
+            // to use 'avg' or 'count' type of aggregation values which are not 
+            // associative (as 'avg') nor have a neutral value (as 'count').
+            // BTW, it allows much more quicker evaluation of the result for a lots of
+            // aggregation function.
+            _(datapoints).each(function (datapoint) {
+                _(agg_fields).each(function (agg_field) {
+                    datapoint[agg_field.name] = agg_funs[agg_field.operator].apply(
+                        this, datapoint[agg_field.name]);
+                });
+            })
 
             this.group_values = group_values; // save for selection purpose
             this.group_labels = group_labels; // save for column titles
@@ -388,7 +407,7 @@ openerp.web_google_chart = function (oe) {
             var self = this;
 
             var graph_data = this.group_records(records, [this.abscissa, this.group_field],
-                                                _(self.columns).pluck('name'));
+                                                self.columns);
 
             var column = self.columns[0]; // ONLY ONE column is supported for now.
             var agg_fun = agg_funs[column.operator];
@@ -410,8 +429,8 @@ openerp.web_google_chart = function (oe) {
                 var line = graph_data[abscissa_key];
                 return [self.group_labels[self.abscissa][abscissa_key]].concat(
                     _(self.group_values[self.group_field]).map(function(group_key) {
-                        return agg_fun.apply(
-                            this, (line[group_key]?line[group_key][column.name]:[]));
+                        // fill missing values with "empty" agg_fun value.
+                        return line[group_key]?line[group_key][column.name]:agg_fun();
                     }));
             });
 
@@ -425,9 +444,8 @@ openerp.web_google_chart = function (oe) {
 
         prepare_data_bar: function(records) {
             var self = this;
-            var columns_label = _(self.columns).pluck('name');
             var graph_data = this.group_records(records, [this.abscissa, ],
-                                                columns_label);
+                                                this.columns);
 
             /*
              * Convert to google data container format
@@ -455,10 +473,11 @@ openerp.web_google_chart = function (oe) {
             });
 
             var rows = _(self.group_values[this.abscissa]).map(function(key) {
-                var record = graph_data[key];
+                var datapoint = graph_data[key];
                 var abscissa_label = self.group_labels[self.abscissa][key];
                 return [abscissa_label].concat(_(self.columns).map(function(column) {
-                    return agg_funs[column.operator].apply(this, record[column.name]);
+                    if (typeof datapoint[column.name] === "undefined") return agg_fun();
+                    return datapoint[column.name];
                 }));
             });
 
