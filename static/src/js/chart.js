@@ -322,7 +322,7 @@ openerp.web_google_chart = function (oe) {
          *        {name: 'nail',    color: 'silver', size: 'small', cost: 1},
          *        {name: 'machine', color: 'silver', size: 'big',   cost: 4},
          *      ], ['color', 'size'], ['cost'])
-         *  
+         *
          */
         group_records: function(records, group_fields, agg_fields) {
 
@@ -403,30 +403,27 @@ openerp.web_google_chart = function (oe) {
             return graph_data;
         },
 
-        prepare_data_grouped_bar: function(records) {
+        /**
+         * Convert to google data container format for 2 grouped values
+         *
+         * Objective is to create:
+         *   [["color",  "big", "small"],
+         *    ["red",       3 ,      0 ],
+         *    ["silver",    4 ,      1 ],]
+         *
+         *  'big' and 'small' are group values upon the group_field 'size'.
+         *  'red' and 'silver' are abscissa values upon the abscissa 'color'.
+         *  numerical values is the aggregation of the column 'price'.
+         */
+        prepare_data_grouped_bar: function(grouped_data) {
             var self = this;
-
-            var graph_data = this.group_records(records, [this.abscissa, this.group_field],
-                                                self.columns);
 
             var column = self.columns[0]; // ONLY ONE column is supported for now.
             var agg_fun = agg_funs[column.operator];
 
-            /*
-             * Convert to google data container format
-             *
-             * Objective is to create:
-             *   [["color",  "big", "small"],
-             *    ["red",       3 ,      0 ],
-             *    ["silver",    4 ,      1 ],]
-             *
-             *  'big' and 'small' are group values upon the group_field 'size'.
-             *  'red' and 'silver' are abscissa values upon the abscissa 'color'.
-             *  numerical values is the aggregation of the column 'price'.
-             */
 
             graph_data = _(self.group_values[this.abscissa]).map(function(abscissa_key) {
-                var line = graph_data[abscissa_key];
+                var line = grouped_data[abscissa_key];
                 return [self.group_labels[self.abscissa][abscissa_key]].concat(
                     _(self.group_values[self.group_field]).map(function(group_key) {
                         // fill missing values with "empty" agg_fun value.
@@ -442,24 +439,72 @@ openerp.web_google_chart = function (oe) {
             return google.visualization.arrayToDataTable([columns_title].concat(graph_data));
         },
 
-        prepare_data_bar: function(records) {
+        /**
+         * Convert to google data container format for 2 grouped values
+         *
+         * The second grouped key should give exactly 2 groups:
+         *
+         * Objective is to create:
+         *   [["color",  "big", "small"],
+         *    ["red",       3 ,      0 ],
+         *    ["silver",    4 ,     -1 ],]
+         *
+         *  'red' and 'silver' are abscissa values upon the abscissa 'color'.
+         *  'big' and 'small' are group values upon the group_field 'size'.
+         *  numerical values is the aggregation of the column 'price'.
+         *
+         */
+        prepare_data_grouped_sym_bar: function(grouped_data) {
             var self = this;
-            var graph_data = this.group_records(records, [this.abscissa, ],
-                                                this.columns);
 
-            /*
-             * Convert to google data container format
-             *
-             * Objective is to create:
-             *   [["color",  "size",       "price"],
-             *    ["red",    'big' ,            3 ],
-             *    ["silver", 'small,big' ,      5 ],]
-             *
-             * first line are the title of the columns
-             * under 'size' and 'price', values are aggregated.
-             * 'red' and 'silver' are abscissa values
-             *
-             */
+            var column = self.columns[0]; // ONLY ONE column is supported for now.
+            var agg_fun = agg_funs[column.operator];
+
+            var group_values = self.group_values[this.group_field];
+
+            if (group_values.length != 2) {
+                var group_labels = _(group_values).map(function (group_key) {
+                    return self.group_labels[self.group_field][group_key];
+                });
+                throw new Error('pyramid type only support 2 values in column ' +
+                                self.group_field + '. ' +
+                                'These are the ' + group_values.length +
+                                ' received values: '+ group_labels.join(", "));
+            };
+
+            graph_data = _(self.group_values[this.abscissa]).map(function(abscissa_key) {
+                var line = grouped_data[abscissa_key];
+                return [self.group_labels[self.abscissa][abscissa_key]].concat(
+                    _(self.group_values[self.group_field]).map(function(group_key, idx) {
+                        // fill missing values with "empty" agg_fun value.
+                        return (idx?-1:1) *   // negative value for the second column
+                          (line[group_key]?line[group_key][column.name]:agg_fun());
+                    }));
+            });
+
+            var columns_title = _([self.fields[this.abscissa].string]).concat(
+                _(this.group_values[this.group_field]).map(function (group_key) {
+                    return self.group_labels[self.group_field][group_key];
+                }));
+            return google.visualization.arrayToDataTable([columns_title].concat(graph_data));
+        },
+
+
+        /**
+         * Convert to google data container format for one group value
+         *
+         * Objective is to create:
+         *   [["color",  "size",       "price"],
+         *    ["red",    'big' ,            3 ],
+         *    ["silver", 'small,big' ,      5 ],]
+         *
+         * first line are the title of the columns
+         * under 'size' and 'price', values are aggregated.
+         * 'red' and 'silver' are abscissa values
+         *
+         */
+        prepare_data_bar: function(grouped_data) {
+            var self = this;
 
             var data = new google.visualization.DataTable();
 
@@ -473,7 +518,7 @@ openerp.web_google_chart = function (oe) {
             });
 
             var rows = _(self.group_values[this.abscissa]).map(function(key) {
-                var datapoint = graph_data[key];
+                var datapoint = grouped_data[key];
                 var abscissa_label = self.group_labels[self.abscissa][key];
                 return [abscissa_label].concat(_(self.columns).map(function(column) {
                     if (typeof datapoint[column.name] === "undefined") return agg_fun();
@@ -496,16 +541,6 @@ openerp.web_google_chart = function (oe) {
                 view_chart = (this.orientation === 'horizontal') ? 'bar':'column';
             }
             if (self.chart == 'pyramid') {
-                // inverting second values
-                if (this.columns.length != 2)
-                    throw new Error('pyramid type only support 2 value columns.' +
-                                    'You\'ve provided '+ this.columns.length +' colums (' + 
-                                    _(this.columns).pluck('name').join(", ") +  ')');
-                var label = this.columns[1].name;
-                _(records).each(function(record) {
-                    record[label] = -record[label];
-                });
-
                 view_chart = 'bar';
                 options['isStacked'] = true;
                 if (typeof options['hAxis'] === "undefined")
@@ -517,7 +552,9 @@ openerp.web_google_chart = function (oe) {
             }
 
             if (!this.group_field || !records.length) {
-                data = this.prepare_data_bar(records);
+                var grouped_data = this.group_records(records, [this.abscissa, ],
+                                                      this.columns);
+                data = this.prepare_data_bar(grouped_data);
             } else {
                 // google chart handles clustered bar charts (> 1 column per abscissa
                 // value) and stacked bar charts (basically the same but with the
@@ -534,7 +571,14 @@ openerp.web_google_chart = function (oe) {
                 // charts
                 if (self.chart == 'bar') options['isStacked'] = true;
 
-                data = this.prepare_data_grouped_bar(records);
+                var grouped_data = this.group_records(records, [this.abscissa, this.group_field],
+                                                self.columns);
+
+                if (self.chart == 'pyramid')
+                    data = this.prepare_data_grouped_sym_bar(grouped_data);
+                else
+                    data = this.prepare_data_grouped_bar(grouped_data);
+
             }
 
             if (self.chart == 'pyramid') {
