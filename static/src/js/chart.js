@@ -22,11 +22,11 @@ var QWeb = oe.web.qweb,
 function make_agg_fun(aggregate2, neutral_value) {
   function agg_fun() {
     if (arguments.length == 0) return neutral_value;
-    var args = Array.prototype.slice.call(arguments);
-    var first = args.shift();
-    if (typeof first === "undefined") return agg_fun.apply(this, args);
-    if (args.length == 0) return first;
-    return aggregate2(first, agg_fun.apply(this, args));
+    var acc = neutral_value;
+    _(arguments).each(function (elt) {
+        acc = aggregate2(acc, elt);
+    });
+    return acc;
   };
   return agg_fun
 };
