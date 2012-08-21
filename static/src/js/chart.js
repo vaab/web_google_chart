@@ -17,7 +17,8 @@ openerp.web_google_chart = function (oe) {
     /**
      * Creates an aggregate function from aggregate2 fun and a neutral value
      *
-     * This only works with agg_fun(x1, ..., xN) = aggregate2(x1, aggregate2(x2 ... aggregate2(xN-1, xN)...))
+     * This only works with agg_fun(x1, ..., xN) =
+     *       aggregate2(aggregate2(... aggregate2(aggregate2(x1, x2), x3),...), xN)
      */
     function make_agg_fun(aggregate2, neutral_value) {
         function agg_fun() {
@@ -313,15 +314,21 @@ openerp.web_google_chart = function (oe) {
         },
 
         /**
-         * Group records along the given group_fields
+         * Group record values in arrays along the given group_fields
          *
-         * It'll accumulate values of self.columns field according to their operator
+         * group_records(
+         *      [
+         *        {name: 'hammer',  color: 'red',    size: 'big',   cost: 3},
+         *        {name: 'nail',    color: 'silver', size: 'small', cost: 1},
+         *        {name: 'machine', color: 'silver', size: 'big',   cost: 4},
+         *      ], ['color', 'size'], ['cost'])
+         *  
          */
-        group_records: function(records, group_fields) {
+        group_records: function(records, group_fields, agg_fields) {
 
             var self = this;
             var group_values = {};  // assoc group_field -> list of record values
-            var group_labels = {};   // assoc group_field -> (assoc key -> label)
+            var group_labels = {};  // assoc group_field -> (assoc key -> label)
 
             var key_fieldname = {};
             _(group_fields).each(function (group_field) {
@@ -356,15 +363,15 @@ openerp.web_google_chart = function (oe) {
 
                 var datapoint = subdct;
 
-                _(self.columns).each(function (column) {
-                    var val       = record[column.name],    // new value to accumulate
-                    aggregate = datapoint[column.name]; // previous value of accumulator
-                    datapoint[column.name] = [val].concat((typeof aggregate !== "undefined")?aggregate:[]);
+                _(agg_fields).each(function (agg_field) {
+                    var val       = record[agg_field];    // new value to accumulate
+                    var aggregate = datapoint[agg_field]; // previous value of accumulator
+                    datapoint[agg_field] = [val].concat((typeof aggregate !== "undefined")?aggregate:[]);
                 });
 
             });
 
-            // we want to sort grouped field upon it's real label and not it's numeric id.
+            // we want to sort grouped field upon their real label and not it's numeric id.
             _(group_fields).each(function (group_field) {
                 group_values[group_field] = _(group_values[group_field]).sortBy(function (key) {
                     return group_labels[group_field][key];
@@ -380,19 +387,30 @@ openerp.web_google_chart = function (oe) {
         prepare_data_grouped_bar: function(records) {
             var self = this;
 
-            var graph_data = this.group_records(records, [this.abscissa, this.group_field]);
+            var graph_data = this.group_records(records, [this.abscissa, this.group_field],
+                                                _(self.columns).pluck('name'));
 
             var column = self.columns[0]; // ONLY ONE column is supported for now.
+            var agg_fun = agg_funs[column.operator];
 
             /*
              * Convert to google data container format
+             *
+             * Objective is to create:
+             *   [["color",  "big", "small"],
+             *    ["red",       3 ,      0 ],
+             *    ["silver",    4 ,      1 ],]
+             *
+             *  'big' and 'small' are group values upon the group_field 'size'.
+             *  'red' and 'silver' are abscissa values upon the abscissa 'color'.
+             *  numerical values is the aggregation of the column 'price'.
              */
 
             graph_data = _(self.group_values[this.abscissa]).map(function(abscissa_key) {
                 var line = graph_data[abscissa_key];
                 return [self.group_labels[self.abscissa][abscissa_key]].concat(
                     _(self.group_values[self.group_field]).map(function(group_key) {
-                        return agg_funs[column.operator].apply(
+                        return agg_fun.apply(
                             this, (line[group_key]?line[group_key][column.name]:[]));
                     }));
             });
@@ -407,12 +425,24 @@ openerp.web_google_chart = function (oe) {
 
         prepare_data_bar: function(records) {
             var self = this;
-
-            var graph_data = this.group_records(records, [this.abscissa, ]);
+            var columns_label = _(self.columns).pluck('name');
+            var graph_data = this.group_records(records, [this.abscissa, ],
+                                                columns_label);
 
             /*
-             * Convert to google data containuer
+             * Convert to google data container format
+             *
+             * Objective is to create:
+             *   [["color",  "size",       "price"],
+             *    ["red",    'big' ,            3 ],
+             *    ["silver", 'small,big' ,      5 ],]
+             *
+             * first line are the title of the columns
+             * under 'size' and 'price', values are aggregated.
+             * 'red' and 'silver' are abscissa values
+             *
              */
+
             var data = new google.visualization.DataTable();
 
             // ensure the abscissa is first column
