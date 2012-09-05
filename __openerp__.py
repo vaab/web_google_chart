@@ -8,7 +8,7 @@ This modules replaces all charts by google chart version.
 
 """,
 
-    "version": "0.2",
+    "version": "%%short-version%%",
     ## As it replace web_graph (and that web_graph auto-installs), we
     ## declare to be dependent to be sure that web_graph is loaded
     ## before.
