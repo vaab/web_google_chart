@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2012-08-03 08:29+0200\n"
+"POT-Creation-Date: 2012-09-05 17:36+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -18,12 +18,12 @@ msgstr ""
 "Generated-By: Babel 0.9.6\n"
 
 #. openerp-web
-#: ../web_google_chart/static/src/js/chart.js:66
+#: ../web_google_chart/static/src/js/chart.js:76
 msgid "Graph"
 msgstr ""
 
 #. openerp-web
-#: ../web_google_chart/static/src/js/chart.js:264
+#: ../web_google_chart/static/src/js/chart.js:358
 msgid "unspecified"
 msgstr ""
 
