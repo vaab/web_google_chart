@@ -2,18 +2,18 @@
 Web Google Chart for OpenERP
 ============================
 
-This is an openerp addons to replace all chart of the web client by
+This is an OpenERP addons to replace all chart of the web client by
 `google chart`_ version. It also adds several new features. Please consult
 the list of features further down.
 
 .. _google chart: https://developers.google.com/chart/
 
 
-Acknowledgements
+Acknowledgments
 ----------------
 
 Many thanks to `CARIF-OREF La Réunion`_ which has funded the near entirety of
-the developpement of this code.
+the development of this code.
 
 .. _CARIF-OREF La Réunion: http://www.cariforef-reunion.net/
 
@@ -31,7 +31,7 @@ this module is not for you.
 Installation
 ------------
 
-Install this as any openerp addons, and then look at your charts.
+Install this as any OpenERP addons, and then look at your charts.
 
 
 Features
@@ -79,7 +79,7 @@ Besides all charts of OpenERP being replaced by google version:
 Troubleshooting
 ---------------
 
-- It has occured on some rare occasion that legacy ``chart.js`` seems to be loaded
+- It has occurred on some rare occasion that legacy ``chart.js`` seems to be loaded
   after the javascript code of this module, leading to google chart NOT replacing
   legacy charts. This remains to be confirmed as I cannot reproduce it.
 
