@@ -1,7 +1,9 @@
+/*global: google_jsapi_loaded,google_visualization_loaded,openerp,window,document */
+
 /*---------------------------------------------------------
  * OpenERP web_google_chart
  *---------------------------------------------------------*/
-google_jsapi_loaded = false; 
+google_jsapi_loaded = false;
 google_visualization_loaded = false;
 
 openerp.web_google_chart = function (oe) {
@@ -22,15 +24,15 @@ openerp.web_google_chart = function (oe) {
      */
     function make_agg_fun(aggregate2, neutral_value) {
         function agg_fun() {
-            if (arguments.length == 0) return neutral_value;
+            if (arguments.length === 0) return neutral_value;
             var acc = neutral_value;
             _(arguments).each(function (elt) {
                 acc = aggregate2(acc, elt);
             });
             return acc;
-        };
-        return agg_fun
-    };
+        }
+        return agg_fun;
+    }
 
     var sum = make_agg_fun(function(a, b) { return a + b; }, 0),
     mul = make_agg_fun(function(a, b) { return a * b; }, 1),
@@ -48,7 +50,7 @@ openerp.web_google_chart = function (oe) {
         'min': min,
         'max': max,
         '#': count,
-        'avg': avg,
+        'avg': avg
     };
 
 
@@ -110,7 +112,7 @@ openerp.web_google_chart = function (oe) {
             // is it the global one we are changing ?
             google_jsapi_loaded = $.Deferred();
             window.ginit = function() {
-                google_jsapi_loaded.resolve(); 
+                google_jsapi_loaded.resolve();
             };
             console.log('Loading Google jsapi.');
             $.getScript('//www.google.com/jsapi' +
@@ -138,10 +140,10 @@ openerp.web_google_chart = function (oe) {
                             google_visualization_loaded.resolve ();
                         }
                     });
-                };
+                }
 
-                google_visualization_loaded.then(function() { 
-                    pkgs_loaded.resolve()
+                google_visualization_loaded.then(function() {
+                    pkgs_loaded.resolve();
                 });
 
             });
@@ -191,9 +193,9 @@ openerp.web_google_chart = function (oe) {
                 if (f.tag == "graph-options") {
                     // Eval returns last object
                     options = eval("x = " + f.children[0]);
-                };
-            })
-                return options
+                }
+            });
+            return options;
         },
 
         on_loaded: function() {
@@ -209,7 +211,7 @@ openerp.web_google_chart = function (oe) {
                     if (field.tag == "html")
                         this.options = this.read_options_from_html(field);
                     return;
-                };
+                }
 
                 var attrs = field.attrs;
                 if (attrs.group) {
@@ -285,10 +287,10 @@ openerp.web_google_chart = function (oe) {
                             break;
                         default:
                             throw new Error(
-                                "Unknown field type " + self.fields[field].type
-                                    + "for field " + field + " (" + oe_value + ")");
+                                "Unknown field type " + self.fields[field].type +
+                                    "for field " + field + " (" + oe_value + ")");
                         }
-                    };
+                    }
 
                     point[field] = value;
                     // storing id to keep a good grouping key
@@ -350,16 +352,16 @@ openerp.web_google_chart = function (oe) {
                     if (typeof group_values[group_field] === "undefined") {
                         group_values[group_field] = [];
                         group_labels[group_field] = {};
-                    };
+                    }
 
                     if (!_.include(group_values[group_field], key)) {
                         group_values[group_field].push(key);
                         group_labels[group_field][key] = record[group_field]?record[group_field]:
                             _t("unspecified");
-                    };
+                    }
 
                     // create sub dict if not existent.
-                    if (typeof subdct[key] === "undefined") subdct[key] = {}
+                    if (typeof subdct[key] === "undefined") subdct[key] = {};
 
                     subdct = subdct[key];                 // move subdct pointer to inner dict
                 });
@@ -367,7 +369,7 @@ openerp.web_google_chart = function (oe) {
                 var datapoint = subdct;
                 if (typeof datapoint[agg_fields[0].name] === "undefined") { // new datapoint
                     datapoints.push(datapoint);
-                };
+                }
 
                 _(agg_field_labels).each(function (agg_field_label) {
                     var val       = record[agg_field_label];    // new value to accumulate
@@ -386,7 +388,7 @@ openerp.web_google_chart = function (oe) {
             });
 
             // Apply the aggregation function to full list of values, this allows
-            // to use 'avg' or 'count' type of aggregation values which are not 
+            // to use 'avg' or 'count' type of aggregation values which are not
             // associative (as 'avg') nor have a neutral value (as 'count').
             // BTW, it allows much more quicker evaluation of the result for a lots of
             // aggregation function.
@@ -395,7 +397,7 @@ openerp.web_google_chart = function (oe) {
                     datapoint[agg_field.name] = agg_funs[agg_field.operator].apply(
                         this, datapoint[agg_field.name]);
                 });
-            })
+            });
 
             this.group_values = group_values; // save for selection purpose
             this.group_labels = group_labels; // save for column titles
@@ -470,7 +472,7 @@ openerp.web_google_chart = function (oe) {
                                 self.group_field + '. ' +
                                 'These are the ' + group_values.length +
                                 ' received values: '+ group_labels.join(", "));
-            };
+            }
 
             graph_data = _(self.group_values[this.abscissa]).map(function(abscissa_key) {
                 var line = grouped_data[abscissa_key];
@@ -512,7 +514,6 @@ openerp.web_google_chart = function (oe) {
             var columns_name = [self.abscissa].concat(_(this.columns).pluck("name"));
 
             _(columns_name).each(function (field) {
-                var oe_type = self.fields[field].type;
                 var type = self.g_column_type(field);
                 data.addColumn(type, self.fields[field].string);
             });
@@ -550,9 +551,9 @@ openerp.web_google_chart = function (oe) {
                     options['vAxis'] = {};
                 options['vAxis']['direction'] = '-1';
             }
-
+            var grouped_data;
             if (!this.group_field || !records.length) {
-                var grouped_data = this.group_records(records, [this.abscissa, ],
+                grouped_data = this.group_records(records, [this.abscissa],
                                                       this.columns);
                 data = this.prepare_data_bar(grouped_data);
             } else {
@@ -562,8 +563,8 @@ openerp.web_google_chart = function (oe) {
                 // does not handle clustered stacked bar charts
                 if (self.chart == 'bar' && (this.columns.length > 1)) {
                     this.$element.text(
-                        'OpenERP Web does not support combining grouping and '
-                            + 'multiple columns in graph at this time.');
+                        'OpenERP Web does not support combining grouping and ' +
+                            'multiple columns in graph at this time.');
                     throw new Error(
                         'google chart can not handle columns counts of that magnitude');
                 }
@@ -571,7 +572,7 @@ openerp.web_google_chart = function (oe) {
                 // charts
                 if (self.chart == 'bar') options['isStacked'] = true;
 
-                var grouped_data = this.group_records(records, [this.abscissa, this.group_field],
+                grouped_data = this.group_records(records, [this.abscissa, this.group_field],
                                                 self.columns);
 
                 if (self.chart == 'pyramid')
@@ -584,7 +585,7 @@ openerp.web_google_chart = function (oe) {
             if (self.chart == 'pyramid') {
                 var formatter = new google.visualization.NumberFormat({ pattern: ';' });
                 formatter.format(data, 2);
-            };
+            }
 
             var renderer = function () {
                 if (self.$element.is(':hidden')) {
@@ -614,7 +615,7 @@ openerp.web_google_chart = function (oe) {
                     google.visualization.events.addListener(chart, 'select', function() {
                         self.open_list_view(chart.getSelection());
                     });
-                };
+                }
             };
 
             if (this.renderer) clearTimeout(this.renderer);
@@ -633,27 +634,27 @@ openerp.web_google_chart = function (oe) {
 
             if (typeof(select_obj.row) !== "undefined") {
                 abscissa_key = this.group_values[this.abscissa][select_obj.row];
-            };
+            }
             if ((typeof(select_obj.column) !== "undefined") && this.group_field) {
                 group_key = self.group_values[this.group_field][select_obj.column - 1]; // first column were labels
-            };
+            }
 
             var views;
             if (this.widget_parent.action) {
                 views = this.widget_parent.action.views;
-                if (!_(views).detect(function (view) {return view[1] === 'list' })) {
+                if (!_(views).detect(function (view) {return view[1] === 'list';})) {
                     views = [[false, 'list']].concat(views);
                 }
             } else {
                 views = _(["list", "form", "graph"]).map(function(mode) {
                     return [false, mode];
                 });
-            };
+            }
 
             var domain =  [[this.abscissa, '=', abscissa_key], ['id','in',this.dataset.ids]];
             if (typeof(group_key) !== "undefined") {
                 domain = domain.concat([[this.group_field, '=', group_key]]);
-            };
+            }
 
             this.do_action({
                 res_model: this.dataset.model,
