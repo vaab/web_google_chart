@@ -656,8 +656,30 @@ openerp.web_google_chart = function (oe) {
                 domain = domain.concat([[this.group_field, '=', group_key]]);
             }
 
+            // convert domain to search_default whenever this is possible
+
+            var search_default = {}
+            if (this.widget_parent.searchview) {
+                var stripped_domain = [];
+                var search_default = {};
+                var fields = _.keys(self.widget_parent.searchview.fields_view.fields);
+                _(domain).each(function (condition) {
+                    var field_name = condition[0];
+                    var operator = condition[1];
+                    var rvalue = condition[2];
+
+                    if (operator === '=' && _.contains(fields, field_name)) {
+                        search_default['search_default_' + field_name] = rvalue;
+                    } else {
+                        stripped_domain.push(condition);
+                    };
+                });
+                domain = stripped_domain;
+            }
+
             this.do_action({
                 res_model: this.dataset.model,
+                context: search_default,
                 'domain': domain,
                 views: views,
                 type: "ir.actions.act_window",
