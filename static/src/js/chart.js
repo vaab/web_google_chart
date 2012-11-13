@@ -651,7 +651,7 @@ openerp.web_google_chart = function (oe) {
                 });
             }
 
-            var domain =  [[this.abscissa, '=', abscissa_key], ['id','in',this.dataset.ids]];
+            var domain =  this.dataset.domain.concat([[this.abscissa, '=', abscissa_key]]);
             if (typeof(group_key) !== "undefined") {
                 domain = domain.concat([[this.group_field, '=', group_key]]);
             }
