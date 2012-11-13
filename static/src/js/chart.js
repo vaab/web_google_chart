@@ -623,7 +623,7 @@ openerp.web_google_chart = function (oe) {
             this.renderer = setTimeout(renderer, 0);
         },
 
-        open_list_view : function (select_info){
+        open_list_view: function (select_info){
             var self = this;
 
             if (!select_info || (select_info.length != 1))
