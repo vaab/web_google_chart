@@ -676,8 +676,8 @@ openerp.web_google_chart = function (oe) {
                 });
                 domain = stripped_domain;
             }
-
             this.do_action({
+                search_view_id: this.widget_parent.action.search_view_id,
                 res_model: this.dataset.model,
                 context: search_default,
                 'domain': domain,
