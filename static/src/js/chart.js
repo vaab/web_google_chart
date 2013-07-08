@@ -161,7 +161,7 @@ openerp.web_google_chart = function (oe) {
                 loaded = this.rpc('/web/view/load', {
                     model: this.dataset.model,
                     view_id: this.view_id,
-                    view_type: 'chart'
+                    view_type: 'graph'
                 });
             }
             return $.when(
